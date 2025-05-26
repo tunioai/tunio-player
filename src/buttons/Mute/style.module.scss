@@ -1,0 +1,21 @@
+.muteButton {
+  width: var(--player-widget-button-size);
+  height: var(--player-widget-button-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--player-widget-button-bg-color);
+  border: 0;
+  border-radius: 50%;
+  color: #000;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #e4e4e4;
+  }
+
+  svg {
+    width: calc(var(--player-widget-button-size) - (var(--player-widget-button-size) / 1.7));
+    height: calc(var(--player-widget-button-size) - (var(--player-widget-button-size) / 1.7));
+  }
+}

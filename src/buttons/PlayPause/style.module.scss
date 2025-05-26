@@ -1,0 +1,49 @@
+.playPauseButton {
+  width: var(--player-widget-play-button-size);
+  height: var(--player-widget-play-button-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--player-widget-button-bg-color);
+  border: 0;
+  border-radius: 50%;
+  color: #000;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+  }
+
+  &.disabled {
+    cursor: default;
+  }
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    vertical-align: middle;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #000;
+    animation: spin 1s linear infinite;
+  }
+
+  svg {
+    width: calc(var(--player-widget-play-button-size) - (var(--player-widget-play-button-size) / 1.7));
+    height: calc(var(--player-widget-play-button-size) - (var(--player-widget-play-button-size) / 1.7));
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

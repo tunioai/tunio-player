@@ -1,0 +1,10 @@
+.cover {
+  width: 100%;
+  height: 100%;
+  background-color: #bdbdbd;
+  background-size: cover;
+  background-position: center;
+  border-radius: var(--player-widget-border-radius);
+  background-size: 105%;
+  z-index: 3;
+}
