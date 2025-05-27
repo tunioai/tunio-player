@@ -1,11 +1,18 @@
 {
   "name": "tunio-player",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Tunio Audio Player Component",
   "type": "module",
   "main": "dist/audio-player.umd.js",
   "module": "dist/audio-player.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/audio-player.js",
+      "require": "./dist/audio-player.umd.js"
+    }
+  },
   "files": [
     "dist"
   ],
