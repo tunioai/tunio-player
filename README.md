@@ -15,13 +15,13 @@ pnpm add tunio-player
 ## Usage
 
 ```jsx
-import { TunioPlayer } from 'tunio-player';
+import Player from 'tunio-player';
 
 const App = () => {
   return (
     <div>
       <h1>My Player</h1>
-      <TunioPlayer name="main" ambient={true} />
+      <Player name="main" ambient={true} theme="dark" />
     </div>
   );
 }
@@ -31,23 +31,26 @@ const App = () => {
 
 ### Props
 
-| Property | Type     | Default   | Description                 |
-|----------|----------|-----------|----------------------------|
-| name     | string   | undefined | Radio stream name          |
-| ambient  | boolean  | false     | Enable background effect   |
+| Property | Type              | Default   | Description                    |
+|----------|-------------------|-----------|--------------------------------|
+| name     | string            | required  | Radio stream name              |
+| ambient  | boolean           | false     | Enable background effect       |
+| theme    | "dark" \| "light" | "dark"    | Player theme                   |
+| opacity  | number            | undefined | Background opacity (0.0 - 1.0) |
 
 ## Local Development
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Run demo in development mode
-npm run dev
+pnpm dev
 
 # Build package
-npm run build
+pnpm build
 ```
+
 
 ## License
 
