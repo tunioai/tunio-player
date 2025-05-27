@@ -11,12 +11,6 @@ dependencies:
   lucide-react:
     specifier: ^0.511.0
     version: 0.511.0(react@19.1.0)
-  react:
-    specifier: ^19.1.0
-    version: 19.1.0
-  react-dom:
-    specifier: ^19.1.0
-    version: 19.1.0(react@19.1.0)
 
 devDependencies:
   '@eslint/js':
@@ -46,6 +40,12 @@ devDependencies:
   globals:
     specifier: ^16.0.0
     version: 16.2.0
+  react:
+    specifier: ^19.1.0
+    version: 19.1.0
+  react-dom:
+    specifier: ^19.1.0
+    version: 19.1.0(react@19.1.0)
   sass:
     specifier: ^1.89.0
     version: 1.89.0
@@ -1816,7 +1816,7 @@ packages:
     dependencies:
       react: 19.1.0
       scheduler: 0.26.0
-    dev: false
+    dev: true
 
   /react-refresh@0.17.0:
     resolution: {integrity: sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ==}
@@ -1826,7 +1826,6 @@ packages:
   /react@19.1.0:
     resolution: {integrity: sha512-FS+XFBNvn3GTAWq26joslQgWNoFu08F4kl0J4CgdNKADkdSGXQyTCnKteIAJy96Br6YbpEU1LSzV5dYtjMkMDg==}
     engines: {node: '>=0.10.0'}
-    dev: false
 
   /readdirp@4.1.2:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
@@ -1893,7 +1892,7 @@ packages:
 
   /scheduler@0.26.0:
     resolution: {integrity: sha512-NlHwttCI/l5gCPR3D1nNXtWABUmBwvZpEQiD4IXSbIDq8BzLIK/7Ir5gTFSGZDUu37K5cMNp0hFtzO38sC7gWA==}
-    dev: false
+    dev: true
 
   /semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
