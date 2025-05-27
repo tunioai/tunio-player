@@ -9,8 +9,8 @@ interface Props {
 
 export const MuteButton: React.FC<Props> = ({ muted, onClick }) => {
   return (
-    <div className={style.muteButton} onClick={onClick}>
+    <button className={style.muteButton} onClick={onClick}>
       {muted ? <VolumeX /> : <Volume2 />}
-    </div>
+    </button>
   )
 }

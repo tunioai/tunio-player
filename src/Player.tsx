@@ -1,5 +1,6 @@
 "use client"
 
+import clsx from "clsx"
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Cover } from "./Cover"
 import { getDominantColor } from "./helper"
@@ -16,8 +17,9 @@ const generateUniqueId = () => `player_${Math.random().toString(36).substr(2, 9)
 const calculateBackgroundSize = (value: number, min: number, max: number) =>
   ((value - min) / (max - min)) * 100 + "% 100%"
 
-const Player: React.FC<Props> = ({ name, ambient = false }) => {
+const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "dark" }) => {
   const playerIdRef = useRef<string>(generateUniqueId())
+  const playerRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLDivElement>(null)
   const titleContainerRef = useRef<HTMLDivElement>(null)
   const currentTrackUpdateInterval = useRef<NodeJS.Timeout | null>(null)
@@ -193,10 +195,18 @@ const Player: React.FC<Props> = ({ name, ambient = false }) => {
     checkOverflow()
   }, [currentTrack, checkOverflow])
 
-  const backgroundStyle = useMemo(
-    () => (bgColor ? { backgroundColor: `rgba(${bgColor.r}, ${bgColor.g}, ${bgColor.b}, 0.5)` } : {}),
-    [bgColor]
-  )
+  const backgroundStyle = useMemo(() => {
+    if (!bgColor) return {}
+    if (theme === "dark") return { backgroundColor: `rgba(${bgColor.r}, ${bgColor.g}, ${bgColor.b}, 0.2)` }
+
+    return {}
+  }, [bgColor, theme])
+
+  useEffect(() => {
+    if (playerRef.current) {
+      playerRef.current.style.setProperty("--player-widget-opacity", opacity.toString())
+    }
+  }, [opacity])
 
   const scrollStyle = useMemo(
     () =>
@@ -208,11 +218,12 @@ const Player: React.FC<Props> = ({ name, ambient = false }) => {
     [isOverflowing, textScrollDistance]
   )
 
-  const showAmbient = ambient || true
-
   return (
-    <div className={styles.player}>
-      {showAmbient && coverURL && <div className={styles.ambient} style={{ backgroundImage: `url(${coverURL})` }} />}
+    <div
+      ref={playerRef}
+      className={clsx(styles.player, { [styles.themeDark]: theme === "dark", [styles.themeLight]: theme === "light" })}
+    >
+      {ambient && coverURL && <div className={styles.ambient} style={{ backgroundImage: `url(${coverURL})` }} />}
       <div className={styles.playerWrapper} style={backgroundStyle}>
         <Cover track={currentTrack} onImageLoad={onCoverImageLoad} />
         <div className={styles.container}>
