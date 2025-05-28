@@ -8,10 +8,9 @@ import { PlayPauseButton } from "./buttons/PlayPause"
 import { MuteButton } from "./buttons/Mute"
 import type { TrackBackground, CurrentResponse, Track } from "./types"
 import type { Props } from "./PlayerTypes"
-import styles from "./style.module.scss"
+
 import useNativeAudio from "./hooks/useNativeAudio"
 
-// Unique ID generator for player instances
 const generateUniqueId = () => `player_${Math.random().toString(36).substr(2, 9)}`
 
 const calculateBackgroundSize = (value: number, min: number, max: number) =>
@@ -221,22 +220,22 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
   return (
     <div
       ref={playerRef}
-      className={clsx(styles.player, { [styles.themeDark]: theme === "dark", [styles.themeLight]: theme === "light" })}
+      className={clsx("tunio-player", { "tunio-theme-dark": theme === "dark", "tunio-theme-light": theme === "light" })}
     >
-      {ambient && coverURL && <div className={styles.ambient} style={{ backgroundImage: `url(${coverURL})` }} />}
-      <div className={styles.playerWrapper} style={backgroundStyle}>
+      {ambient && coverURL && <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />}
+      <div className="tunio-player-wrapper" style={backgroundStyle}>
         <Cover track={currentTrack} onImageLoad={onCoverImageLoad} />
-        <div className={styles.container}>
+        <div className="tunio-container">
           <div ref={titleContainerRef}>
             <div
               ref={titleRef}
-              className={`${styles.title} ${isOverflowing ? styles.scrolling : ""}`}
+              className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}
               style={scrollStyle}
             >
               {currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "}
             </div>
           </div>
-          <div className={styles.actions}>
+          <div className="tunio-actions">
             <PlayPauseButton
               action={isPlaying ? "stop" : "play"}
               onStop={handlePlayToggle}
@@ -244,7 +243,7 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
               loading={buffering}
             />
             <MuteButton onClick={toggleMute} muted={isMuted} />
-            <div className={styles.nativeRangeContainer}>
+            <div className="tunio-native-range-container">
               <input
                 type="range"
                 min="0"
@@ -252,7 +251,7 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
                 step="0.01"
                 value={volume}
                 onChange={handleVolumeChange}
-                className={styles.nativeRange}
+                className="tunio-native-range"
                 style={{ backgroundSize: volumeBarBackgroundSize }}
               />
             </div>

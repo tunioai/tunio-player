@@ -1,6 +1,5 @@
 import React from "react"
 import { VolumeX, Volume2 } from "lucide-react"
-import style from "./style.module.scss"
 
 interface Props {
   muted: boolean
@@ -9,7 +8,7 @@ interface Props {
 
 export const MuteButton: React.FC<Props> = ({ muted, onClick }) => {
   return (
-    <button className={style.muteButton} onClick={onClick}>
+    <button className="tunio-mute-button" onClick={onClick}>
       {muted ? <VolumeX /> : <Volume2 />}
     </button>
   )

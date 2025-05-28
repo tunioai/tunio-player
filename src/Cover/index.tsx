@@ -1,6 +1,5 @@
 import React, { useState } from "react"
 import type { Track } from "../types"
-import style from "./style.module.scss"
 
 interface Props {
   track: Track | undefined
@@ -28,7 +27,7 @@ export const Cover: React.FC<Props> = ({ track, onImageLoad }) => {
 
   return (
     <div
-      className={style.cover}
+      className="tunio-cover"
       style={{
         backgroundImage: `url(${coverImage})`
       }}

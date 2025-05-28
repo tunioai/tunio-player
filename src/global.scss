@@ -1,4 +1,4 @@
-.player {
+.tunio-player {
   position: relative;
   width: 300px;
 
@@ -11,7 +11,7 @@
   --player-widget-button-size: 28px;
   --player-widget-opacity: 1;
 
-  &.themeDark {
+  &.tunio-theme-dark {
     --player-widget-bg-container-color: 31, 37, 52;
     --player-widget-bg-color: 0, 0, 0;
     --player-widget-button-bg-color: #fff;
@@ -20,7 +20,7 @@
     --player-widget-range-bg-color: rgba(255, 255, 255, 0.1);
   }
 
-  &.themeLight {
+  &.tunio-theme-light {
     --player-widget-bg-container-color: 255, 255, 255;
     --player-widget-bg-color: 255, 255, 255;
     --player-widget-button-bg-color: #dcdcdc;
@@ -29,7 +29,7 @@
     --player-widget-range-bg-color: rgba(0, 0, 0, 0.1);
   }
 
-  .ambient {
+  .tunio-ambient {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -44,13 +44,13 @@
     z-index: 0;
     pointer-events: none;
 
-    animation: subtleMove 15s infinite alternate ease-in-out, pulseGlow 8s infinite alternate ease-in-out,
-      hueRotate 20s infinite linear;
+    animation: tunio-subtleMove 15s infinite alternate ease-in-out, tunio-pulseGlow 8s infinite alternate ease-in-out,
+      tunio-hueRotate 20s infinite linear;
 
     box-shadow: 0 0 30px rgba(255, 255, 255, 0.3), 0 0 60px rgba(255, 255, 255, 0.2), 0 0 90px rgba(255, 255, 255, 0.2);
   }
 
-  .ambient:after {
+  .tunio-ambient:after {
     content: "";
     position: absolute;
     top: 0;
@@ -60,10 +60,10 @@
     background: inherit;
     filter: blur(30px) brightness(1.5);
     opacity: 0.8;
-    animation: subtleMove2 12s infinite alternate-reverse ease-in-out;
+    animation: tunio-subtleMove2 12s infinite alternate-reverse ease-in-out;
   }
 
-  .playerWrapper {
+  .tunio-player-wrapper {
     position: relative;
     display: grid;
     grid-template-columns: var(--player-widget-height) 1fr;
@@ -93,7 +93,7 @@
       z-index: 2;
     }
 
-    .container {
+    .tunio-container {
       position: relative;
       z-index: 2;
       color: var(--player-widget-text-color);
@@ -101,7 +101,7 @@
       overflow: hidden;
       text-align: left !important;
 
-      .title {
+      .tunio-title {
         display: inline-block;
         height: 24px;
         font-size: 13px;
@@ -111,12 +111,13 @@
         position: relative;
         user-select: none;
 
-        &.scrolling {
-          animation: scrollText 12s ease-in-out infinite;
+        &.tunio-scrolling {
+          animation: tunio-scrollText 12s ease-in-out infinite;
         }
       }
 
-      .actions {
+      .tunio-actions {
+        position: relative;
         display: flex;
         align-items: center;
 
@@ -124,10 +125,10 @@
           margin-right: 6px;
         }
 
-        .nativeRangeContainer {
+        .tunio-native-range-container {
           display: flex;
 
-          .nativeRange {
+          .tunio-native-range {
             display: flex;
             appearance: none;
             width: 80px;
@@ -166,7 +167,81 @@
   }
 }
 
-@keyframes subtleMove {
+.tunio-cover {
+  width: 100%;
+  height: 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border-radius: calc(var(--player-widget-border-radius) - 5px);
+  position: relative;
+  z-index: 2;
+}
+
+.tunio-play-pause-button {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--player-widget-button-size);
+  height: var(--player-widget-button-size);
+  background-color: var(--player-widget-button-bg-color);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--player-widget-button-hover);
+  }
+
+  &.tunio-disabled {
+    opacity: 0.6;
+    cursor: default;
+    transform: none !important;
+  }
+
+  .tunio-spinner {
+    width: 13px;
+    height: 13px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #333;
+    border-radius: 50%;
+    animation: tunio-spin 1s linear infinite;
+  }
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+.tunio-mute-button {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--player-widget-button-size);
+  height: var(--player-widget-button-size);
+  background-color: var(--player-widget-button-bg-color);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--player-widget-button-hover);
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@keyframes tunio-subtleMove {
   0% {
     transform: translate(-50%, -50%) scale(1) rotate(0deg);
   }
@@ -178,7 +253,7 @@
   }
 }
 
-@keyframes subtleMove2 {
+@keyframes tunio-subtleMove2 {
   0% {
     transform: scale(1) rotate(0deg);
   }
@@ -190,7 +265,7 @@
   }
 }
 
-@keyframes pulseGlow {
+@keyframes tunio-pulseGlow {
   0% {
     opacity: 0.5;
     filter: blur(35px) brightness(1.5);
@@ -200,43 +275,36 @@
     filter: blur(45px) brightness(1.8);
   }
   100% {
-    opacity: 0.6;
-    filter: blur(40px) brightness(1.7);
+    opacity: 0.9;
+    filter: blur(40px) brightness(2);
   }
 }
 
-@keyframes hueRotate {
+@keyframes tunio-hueRotate {
   0% {
-    filter: blur(40px) brightness(1.7) hue-rotate(0deg);
+    filter: blur(40px) brightness(2) hue-rotate(0deg);
   }
   100% {
-    filter: blur(40px) brightness(1.7) hue-rotate(360deg);
+    filter: blur(40px) brightness(2) hue-rotate(360deg);
   }
 }
 
-@keyframes scrollText {
+@keyframes tunio-scrollText {
   0%,
-  25% {
+  20% {
     transform: translateX(0);
   }
-  45%,
-  55% {
-    transform: translateX(var(--scroll-distance, 0px));
-  }
-  75%,
+  80%,
   100% {
-    transform: translateX(0);
+    transform: translateX(-100%);
   }
 }
 
-@keyframes pulse {
+@keyframes tunio-spin {
   0% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 0.8;
+    transform: rotate(0deg);
   }
   100% {
-    opacity: 0.5;
+    transform: rotate(360deg);
   }
 }

@@ -1,6 +1,6 @@
 # Tunio Player
 
-React component for playing Tunio audio content.
+Tunio Audio Player Component for React applications.
 
 ## Installation
 
@@ -14,29 +14,46 @@ pnpm add tunio-player
 
 ## Usage
 
-```jsx
-import Player from 'tunio-player';
+### Import the component and styles
 
-const App = () => {
+```tsx
+import { TunioPlayer } from 'tunio-player'
+import 'tunio-player/dist/audio-player.css'
+
+function App() {
   return (
     <div>
-      <h1>My Player</h1>
-      <Player name="main" ambient={true} theme="dark" />
+      <TunioPlayer 
+        name="your-radio-name" 
+        theme="dark" 
+        ambient={true} 
+      />
     </div>
-  );
+  )
 }
 ```
 
-## API
-
 ### Props
 
-| Property | Type              | Default   | Description                    |
-|----------|-------------------|-----------|--------------------------------|
-| name     | string            | required  | Radio stream name              |
-| ambient  | boolean           | false     | Enable background effect       |
-| theme    | "dark" \| "light" | "dark"    | Player theme                   |
-| opacity  | number            | undefined | Background opacity (0.0 - 1.0) |
+- `name` (string): Radio station name
+- `theme` ("dark" | "light"): Player theme (default: "dark")
+- `ambient` (boolean): Enable ambient background effect (default: false)
+- `opacity` (number): Player opacity (default: 1)
+
+## Features
+
+- 🎵 Audio streaming with auto-reconnection
+- 🎨 Dark and light themes
+- ✨ Ambient background effects
+- 📱 Responsive design
+- 🔊 Volume control
+- 🔇 Mute functionality
+- ⏯️ Play/pause controls
+- 📡 Real-time track information
+
+## TypeScript Support
+
+This package includes TypeScript definitions out of the box.
 
 ## Local Development
 
@@ -50,7 +67,6 @@ pnpm dev
 # Build package
 pnpm build
 ```
-
 
 ## License
 

@@ -13,8 +13,7 @@
     "noFallthroughCasesInSwitch": true,
     "declaration": true,
     "declarationDir": "./dist",
-    "outDir": "./dist",
-    "emitDeclarationOnly": true
+    "outDir": "./dist"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "src/main.tsx", "dist"]
