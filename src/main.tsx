@@ -11,12 +11,12 @@ const App: React.FC = () => {
       <h1>Tunio Player Demo</h1>
       <div className="player-wrapper-dark">
         <h2>Player with Ambient Mode</h2>
-        <Player name="main" ambient={true} />
+        <Player name="main" ambient />
       </div>
 
       <div className="player-wrapper-light">
         <h2>Player with Ambient Mode on light background</h2>
-        <Player name="ambient" theme="light"  ambient/>
+        <Player name="ambient" theme="light" ambient />
       </div>
 
       <div className="player-wrapper-color">

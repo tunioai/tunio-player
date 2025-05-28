@@ -110,9 +110,13 @@
         white-space: nowrap;
         position: relative;
         user-select: none;
+        max-width: 100%;
 
         &.tunio-scrolling {
-          animation: tunio-scrollText 12s ease-in-out infinite;
+          display: inline-block;
+          white-space: nowrap;
+          padding-right: 20px;
+          animation: tunio-scrollText 8s linear infinite;
         }
       }
 
@@ -191,6 +195,7 @@
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
+  color: #333;
 
   &:hover {
     background-color: var(--player-widget-button-hover);
@@ -230,6 +235,7 @@
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
+  color: #333;
 
   &:hover {
     background-color: var(--player-widget-button-hover);
@@ -291,12 +297,24 @@
 
 @keyframes tunio-scrollText {
   0%,
-  20% {
+  2% {
     transform: translateX(0);
   }
-  80%,
+  20%,
+  32% {
+    transform: translateX(var(--scroll-distance));
+  }
+  50%,
+  52% {
+    transform: translateX(0);
+  }
+  70%,
+  82% {
+    transform: translateX(var(--scroll-distance));
+  }
+  98%,
   100% {
-    transform: translateX(-100%);
+    transform: translateX(0);
   }
 }
 
