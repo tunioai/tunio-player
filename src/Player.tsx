@@ -71,7 +71,13 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
 
     const fetchData = async () => {
       try {
-        const response = await fetch(`https://app.tunio.ai/api/radio/${name}/current`)
+        const response = await fetch(`https://app.tunio.ai/api/radio/${name}/current`, {
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          keepalive: true
+        })
         const data: CurrentResponse = await response.json()
 
         if (data.success) {
@@ -169,20 +175,7 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
 
     initialLoadingRef.current = true
     fetchCurrentTrack()
-
     currentTrackUpdateInterval.current = setInterval(fetchCurrentTrack, 15_000)
-
-    return () => {
-      if (currentTrackUpdateInterval.current) {
-        clearInterval(currentTrackUpdateInterval.current)
-        currentTrackUpdateInterval.current = null
-      }
-
-      if (checkOverflowTimeoutRef.current) {
-        clearTimeout(checkOverflowTimeoutRef.current)
-        checkOverflowTimeoutRef.current = null
-      }
-    }
   }, [name, isPlaying, stop, fetchCurrentTrack])
 
   useEffect(() => {
@@ -227,11 +220,7 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
         <Cover track={currentTrack} onImageLoad={onCoverImageLoad} />
         <div className="tunio-container">
           <div ref={titleContainerRef}>
-            <div
-              ref={titleRef}
-              className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}
-              style={scrollStyle}
-            >
+            <div ref={titleRef} className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`} style={scrollStyle}>
               {currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "}
             </div>
           </div>

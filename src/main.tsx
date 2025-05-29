@@ -11,7 +11,7 @@ const App: React.FC = () => {
       <h1>Tunio Player Demo</h1>
       <div className="player-wrapper-dark">
         <h2>Player with Ambient Mode</h2>
-        <Player name="main" ambient />
+        <Player name="main" ambient opacity={0} />
       </div>
 
       <div className="player-wrapper-light">
@@ -21,7 +21,7 @@ const App: React.FC = () => {
 
       <div className="player-wrapper-color">
         <h2>Player with Ambient Mode on light background</h2>
-        <Player name="apocalypse" theme="dark" opacity={1} ambient />
+        <Player name="apocalypse" theme="dark" opacity={0} ambient />
       </div>
     </div>
   )

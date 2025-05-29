@@ -32,7 +32,10 @@ const inlineCSS = (): Plugin => {
         if (fileName.endsWith(".js")) {
           const jsFile = bundle[fileName] as OutputChunk
           if (jsFile.type === "chunk") {
-            // Inject CSS as a style tag into the JS
+            // Check if the file already has "use client" directive
+            const hasUseClient = jsFile.code.includes('"use client";')
+            
+            // Inject CSS as a style tag into the JS, but preserve "use client" at the top
             const injectCode = `
 (function() {
   if (typeof document !== 'undefined') {
@@ -43,7 +46,13 @@ const inlineCSS = (): Plugin => {
   }
 })();`
 
-            jsFile.code = injectCode + jsFile.code
+            // If the file has "use client", remove it from the original code and add it at the top
+            if (hasUseClient) {
+              jsFile.code = jsFile.code.replace('"use client";', '')
+              jsFile.code = '"use client";' + injectCode + jsFile.code
+            } else {
+              jsFile.code = injectCode + jsFile.code
+            }
           }
         }
       })
