@@ -26,6 +26,7 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
   const previousNameRef = useRef<string | undefined>(undefined)
   const streamsDataRef = useRef<Array<string>>([])
   const checkOverflowTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const [bgColor, setBgColor] = useState<TrackBackground | null>(null)
   const [currentTrack, setCurrentTrack] = useState<Track | undefined>(undefined)
@@ -69,6 +70,12 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
   const fetchCurrentTrack = useCallback(() => {
     if (!name) return
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    abortControllerRef.current = new AbortController()
+
     const fetchData = async () => {
       try {
         const response = await fetch(`https://app.tunio.ai/api/radio/${name}/current`, {
@@ -76,14 +83,15 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
             "Content-Type": "application/json",
             "Accept": "application/json"
           },
-          keepalive: true
+          keepalive: true,
+          signal: abortControllerRef.current?.signal
         })
         const data: CurrentResponse = await response.json()
 
         if (data.success) {
           setCurrentTrack(data.track)
 
-          if (data.streams?.length) {
+          if (data.streams?.length && !streamsDataRef.current.length) {
             streamsDataRef.current = data.streams
             setStreamsData(data.streams)
           }
@@ -98,7 +106,9 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
           }, 100)
         }
       } catch (error) {
-        console.error("Error fetching current track", error)
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Error fetching current track", error)
+        }
       } finally {
         initialLoadingRef.current = false
       }

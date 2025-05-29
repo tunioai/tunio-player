@@ -1,6 +1,6 @@
 {
   "name": "tunio-player",
-  "version": "1.0.10",
+  "version": "1.0.12",
   "description": "Tunio Audio Player Component",
   "type": "module",
   "main": "dist/audio-player.umd.js",
