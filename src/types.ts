@@ -13,8 +13,13 @@ export interface TrackBackground {
   b: number
 }
 
+export interface Stream {
+  title: string
+}
+
 export interface CurrentResponse {
   success: boolean
   streams: Array<string>
   track: Track
+  stream: Stream
 }

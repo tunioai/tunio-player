@@ -4,9 +4,12 @@ import clsx from "clsx"
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Cover } from "./Cover"
 import { getDominantColor } from "./helper"
+import WaterMark from "./WaterMark"
 import { PlayPauseButton } from "./buttons/PlayPause"
 import { MuteButton } from "./buttons/Mute"
-import type { TrackBackground, CurrentResponse, Track } from "./types"
+import { VisualizerButton } from "./buttons/VisualizerButton"
+import VisualizerOverlay from "./VisualizerOverlay"
+import type { TrackBackground, CurrentResponse, Track, Stream } from "./types"
 import type { Props } from "./PlayerTypes"
 
 import useNativeAudio from "./hooks/useNativeAudio"
@@ -30,14 +33,17 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
 
   const [bgColor, setBgColor] = useState<TrackBackground | null>(null)
   const [currentTrack, setCurrentTrack] = useState<Track | undefined>(undefined)
+  const [streamDetails, setStreamDetails] = useState<Stream | null>(null)
   const [coverURL, setCoverURL] = useState<string | null>(null)
   const [isOverflowing, setIsOverflowing] = useState(false)
   const [textScrollDistance, setTextScrollDistance] = useState(0)
   const [streamsData, setStreamsData] = useState<Array<string>>([])
+  const [isVisualizerOpen, setIsVisualizerOpen] = useState(false)
+  const fullscreenOwnerRef = useRef(false)
 
   const streams = useMemo(() => streamsData, [streamsData])
 
-  const { isPlaying, volume, isMuted, buffering, setVolume, toggleMute, play, stop } = useNativeAudio(streams)
+  const { isPlaying, volume, isMuted, buffering, setVolume, toggleMute, play, stop, audioRef } = useNativeAudio(streams)
 
   const volumeBarBackgroundSize = calculateBackgroundSize(volume, 0, 1)
 
@@ -90,6 +96,7 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
 
         if (data.success) {
           setCurrentTrack(data.track)
+          setStreamDetails(data.stream)
 
           if (data.streams?.length && !streamsDataRef.current.length) {
             streamsDataRef.current = data.streams
@@ -139,6 +146,87 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
       )
     }
   }, [isPlaying, play, stop])
+
+  const enterFullscreen = useCallback(() => {
+    const element = playerRef.current
+    if (!element || fullscreenOwnerRef.current) return
+
+    const request =
+      element.requestFullscreen ||
+      (element as typeof element & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen ||
+      (element as typeof element & { msRequestFullscreen?: () => Promise<void> }).msRequestFullscreen
+
+    if (!request) return
+
+    const result = request.call(element)
+    fullscreenOwnerRef.current = true
+
+    if (result instanceof Promise) {
+      result.catch(() => {
+        fullscreenOwnerRef.current = false
+      })
+    }
+  }, [])
+
+  const exitFullscreen = useCallback(() => {
+    if (!fullscreenOwnerRef.current) return
+
+    const exit =
+      document.exitFullscreen ||
+      (document as Document & { webkitExitFullscreen?: () => Promise<void> }).webkitExitFullscreen ||
+      (document as Document & { msExitFullscreen?: () => Promise<void> }).msExitFullscreen
+
+    if (!exit) {
+      fullscreenOwnerRef.current = false
+      return
+    }
+
+    const result = exit.call(document)
+
+    if (result instanceof Promise) {
+      result.finally(() => {
+        fullscreenOwnerRef.current = false
+      })
+    } else {
+      fullscreenOwnerRef.current = false
+    }
+  }, [])
+
+  const handleVisualizerOpen = useCallback(() => {
+    setIsVisualizerOpen(true)
+    enterFullscreen()
+  }, [enterFullscreen])
+
+  const handleVisualizerClose = useCallback(() => {
+    setIsVisualizerOpen(false)
+    exitFullscreen()
+  }, [exitFullscreen])
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const element = playerRef.current
+      if (!element) return
+      const isCurrentFullscreen = document.fullscreenElement === element
+      if (!isCurrentFullscreen && fullscreenOwnerRef.current) {
+        fullscreenOwnerRef.current = false
+        setIsVisualizerOpen(false)
+      }
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange)
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (fullscreenOwnerRef.current) {
+        exitFullscreen()
+      }
+    }
+  }, [exitFullscreen])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -242,21 +330,38 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
               loading={buffering}
             />
             <MuteButton onClick={toggleMute} muted={isMuted} />
-            <div className="tunio-native-range-container">
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={volume}
-                onChange={handleVolumeChange}
-                className="tunio-native-range"
-                style={{ backgroundSize: volumeBarBackgroundSize }}
-              />
+            <VisualizerButton onClick={handleVisualizerOpen} />
+            <div className="tunio-native-range-wrapper">
+              <div className="tunio-native-range-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  className="tunio-native-range"
+                  style={{ backgroundSize: volumeBarBackgroundSize }}
+                />
+              </div>
             </div>
           </div>
         </div>
+        <div className="tunio-player-watermark">
+          <WaterMark height={14} color={theme === "dark" ? "#fff" : "#000"} />
+        </div>
       </div>
+
+      {isVisualizerOpen && (
+        <VisualizerOverlay
+          audioRef={audioRef}
+          isOpen={isVisualizerOpen}
+          onClose={handleVisualizerClose}
+          track={currentTrack}
+          stream={streamDetails}
+          name={name}
+        />
+      )}
     </div>
   )
 }

@@ -289,7 +289,8 @@ const useNativeAudio = (streams: Array<string> = []) => {
     setVolume,
     toggleMute,
     play,
-    stop
+    stop,
+    audioRef
   }
 }
 
