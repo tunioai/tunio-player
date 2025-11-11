@@ -37,14 +37,31 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
   const dataArrayRef = useRef<Uint8Array | null>(null)
   const barLevelsRef = useRef<Float32Array | null>(null)
 
+  const peakYRef = useRef<Float32Array | null>(null)
+  const peakVelRef = useRef<Float32Array | null>(null) // fallow speed
+
+  const BAR_COUNT = 120
+  const DPR = typeof window !== "undefined" ? Math.max(1, window.devicePixelRatio || 1) : 1
+  const TRAIL_ALPHA = 0.08 // lower - tail higher
+  const PEAK_GRAVITY = 0.45
+  const PEAK_BOOST = 6.0
+  const PEAK_MIN_STEP = 0.8
+  const CAP_MIN = 2
+  const CAP_MAX = 4
+
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-
+    // NEW: hi-dpi ресайз
     const { innerWidth, innerHeight } = window
-    canvas.width = innerWidth
-    canvas.height = innerHeight
-  }, [])
+    canvas.style.width = `${innerWidth}px`
+    canvas.style.height = `${innerHeight}px`
+    canvas.width = Math.floor(innerWidth * DPR)
+    canvas.height = Math.floor(innerHeight * DPR)
+
+    const ctx = canvas.getContext("2d")
+    if (ctx) ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
+  }, [DPR])
 
   const stopAnimation = useCallback(() => {
     if (animationFrameRef.current) {
@@ -63,16 +80,15 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
     if (!canvas) return
 
     resizeCanvas()
-
     const handleResize = () => resizeCanvas()
     window.addEventListener("resize", handleResize)
 
     const draw = () => {
-      const context = canvas.getContext("2d")
+      const ctx = canvas.getContext("2d")
       const analyser = analyserRef.current
       const dataArray = dataArrayRef.current
 
-      if (!context || !analyser || !dataArray) {
+      if (!ctx || !analyser || !dataArray) {
         animationFrameRef.current = requestAnimationFrame(draw)
         return
       }
@@ -80,22 +96,30 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
       // @ts-ignore
       analyser.getByteFrequencyData(dataArray)
 
-      const width = canvas.width
-      const height = canvas.height
+      const width = canvas.width / DPR
+      const height = canvas.height / DPR
 
-      context.fillStyle = "rgba(8, 12, 26, 0.24)"
-      context.fillRect(0, 0, width, height)
+      // NEW: Ghost-trail - dont clean frame
+      ctx.fillStyle = `rgba(8, 12, 26, ${TRAIL_ALPHA})`
+      ctx.fillRect(0, 0, width, height)
 
-      const barCount = 120
+      // prepare peak - array
+      const barCount = BAR_COUNT
       const barWidth = width / barCount
+
       if (!barLevelsRef.current || barLevelsRef.current.length !== barCount) {
         barLevelsRef.current = new Float32Array(barCount)
       }
-      const barLevels = barLevelsRef.current
-      if (!barLevels) {
-        animationFrameRef.current = requestAnimationFrame(draw)
-        return
+      if (!peakYRef.current || peakYRef.current.length !== barCount) {
+        peakYRef.current = new Float32Array(barCount).fill(height) // изначально “упали” вниз
       }
+      if (!peakVelRef.current || peakVelRef.current.length !== barCount) {
+        peakVelRef.current = new Float32Array(barCount) // 0
+      }
+
+      const barLevels = barLevelsRef.current
+      const peakY = peakYRef.current
+      const peakVel = peakVelRef.current
 
       for (let i = 0; i < barCount; i += 1) {
         const proportion = i / Math.max(1, barCount - 1)
@@ -116,30 +140,51 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
         barLevels[i] = eased
 
         const easedHeight = Math.pow(eased, 1.3)
-        const barHeight = height * easedHeight * 0.75
+        const barHeight = Math.max(4, height * easedHeight * 0.75) // минимум, чтобы не исчезала
         const x = i * barWidth
-        const gradient = context.createLinearGradient(x, height, x, height - barHeight)
+        const yTop = height - barHeight
+
+        // Tunio Gradient
+        const gradient = ctx.createLinearGradient(x, height, x, yTop)
         gradient.addColorStop(0, "rgba(64, 169, 255, 0)")
         gradient.addColorStop(0.4, "rgba(120, 200, 255, 0.4)")
         gradient.addColorStop(1, "rgba(194, 163, 255, 0.9)")
-        context.fillStyle = gradient
-        context.fillRect(x + barWidth * 0.3, height - barHeight, barWidth * 0.4, Math.max(barHeight, 4))
+        ctx.fillStyle = gradient
+        ctx.fillRect(x + barWidth * 0.3, yTop, barWidth * 0.4, barHeight)
+
+        // Caps
+        const currentPeakY = peakY[i]
+        if (yTop < currentPeakY - 1) {
+          // up cap
+          peakY[i] = yTop
+          peakVel[i] = PEAK_BOOST
+        } else {
+          // fallow
+          peakVel[i] = Math.max(PEAK_MIN_STEP, peakVel[i] - PEAK_GRAVITY)
+          peakY[i] = Math.min(height, currentPeakY + peakVel[i])
+        }
+
+        // draw cap
+        const capH = Math.max(CAP_MIN, Math.min(CAP_MAX, barWidth * 0.25))
+        ctx.fillStyle = "rgba(255,255,255,0.95)"
+        ctx.fillRect(x + barWidth * 0.28, Math.max(0, peakY[i] - capH), barWidth * 0.44, capH)
       }
 
+      // pulse
       const bassValue = dataArray[5] / 255
       const pulseRadius = 180 + bassValue * 140
       const hue = 210 + bassValue * 25
 
-      context.save()
-      context.globalCompositeOperation = "screen"
-      context.beginPath()
-      context.strokeStyle = `hsla(${hue}, 80%, 65%, 0.45)`
-      context.lineWidth = 1.5
-      context.shadowBlur = 30
-      context.shadowColor = `hsla(${hue}, 80%, 65%, 0.6)`
-      context.arc(width / 2, height / 2, pulseRadius, 0, Math.PI * 2)
-      context.stroke()
-      context.restore()
+      ctx.save()
+      ctx.globalCompositeOperation = "screen"
+      ctx.beginPath()
+      ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.15)`
+      ctx.lineWidth = 1.5
+      ctx.shadowBlur = 30
+      ctx.shadowColor = `hsla(${hue}, 80%, 65%, 0.5)`
+      ctx.arc(width / 2, height / 2, pulseRadius, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
 
       animationFrameRef.current = requestAnimationFrame(draw)
     }
@@ -187,31 +232,22 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
       window.removeEventListener("resize", handleResize)
       stopAnimation()
     }
-  }, [audioRef, isOpen, resizeCanvas, stopAnimation])
+  }, [audioRef, isOpen, resizeCanvas, stopAnimation, DPR])
 
   useEffect(() => {
     if (!isOpen) return
-
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose()
-      }
+      if (event.key === "Escape") onClose()
     }
-
     window.addEventListener("keydown", handleKeyDown)
-
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [isOpen, onClose])
 
-  if (!isOpen) {
-    return null
-  }
+  if (!isOpen) return null
 
   const stationLabel = stream?.title || "Tunio Radio"
   const title = track?.title || "Live stream"
-  const artist = track?.artist || stationLabel
   const titleKey = `${stationLabel}-${title}`
-  const artistKey = `${stationLabel}-${artist}`
   const normalizedStationLength = stationLabel.replace(/\s+/g, "").length
   const stationClassName =
     normalizedStationLength <= 10
@@ -226,20 +262,15 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
     <div className="tunio-visualizer-overlay" role="dialog" aria-modal={true} onClick={onClose}>
       <div className="tunio-visualizer-backdrop" style={{ backgroundImage: `url(${backdropUrl})` }} />
       <canvas ref={canvasRef} className="tunio-visualizer-canvas" aria-hidden="true" />
-
       <div className="tunio-visualizer-planet" />
       <div className="tunio-visualizer-info">
         <div className="tunio-visualizer-watermark">
           <WaterMark height={30} color="#fff" />
         </div>
-
         <div className={stationClassName}>{stationLabel}</div>
         <div key={titleKey} className="tunio-visualizer-title tunio-visualizer-text-change">
           {title}
         </div>
-        {/* <div key={artistKey} className="tunio-visualizer-artist tunio-visualizer-text-change">
-          {artist}
-        </div> */}
       </div>
     </div>
   )

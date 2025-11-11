@@ -289,13 +289,14 @@
 .tunio-visualizer-backdrop {
   position: absolute;
   inset: 0;
-  background-position: center;
-  background-size: cover;
+  background-position: 40% 45%;
+  background-size: 120% 120%;
   background-repeat: no-repeat;
   filter: blur(4px) saturate(1.25);
   opacity: 0.9;
-  // transform: scale(1.05);
   z-index: 0;
+  animation: tunio-pan 22s ease-in-out infinite alternate;
+  will-change: background-position, transform;
 }
 
 .tunio-visualizer-canvas {
@@ -322,11 +323,9 @@
   inset: 0;
   pointer-events: none;
   z-index: 1;
-}
-
-.tunio-visualizer-planet {
   background: radial-gradient(circle at 70% 60%, rgba(90, 61, 255, 0.28), rgba(8, 11, 21, 0));
   filter: blur(140px);
+  animation: tunio-planet-drift 30s ease-in-out infinite alternate;
 }
 
 .tunio-visualizer-info {
@@ -362,11 +361,6 @@
   font-size: clamp(32px, 5vw, 90px);
   line-height: clamp(32px, 5vw, 90px);
   font-weight: 600;
-}
-
-.tunio-visualizer-artist {
-  font-size: clamp(28px, 3vw, 60px);
-  color: rgba(255, 255, 255, 0.75);
 }
 
 .tunio-visualizer-text-change {
@@ -425,5 +419,46 @@
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes tunio-pan {
+  0% {
+    background-position: 35% 40%;
+    transform: scale(1.04);
+  }
+  25% {
+    background-position: 65% 42%;
+    transform: scale(1.055);
+  }
+  50% {
+    background-position: 60% 60%;
+    transform: scale(1.06);
+  }
+  75% {
+    background-position: 40% 58%;
+    transform: scale(1.055);
+  }
+  100% {
+    background-position: 50% 50%;
+    transform: scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tunio-visualizer-backdrop {
+    animation: none;
+    transform: none;
+  }
+}
+
+@keyframes tunio-planet-drift {
+  0% {
+    background-position: 70% 60%;
+    transform: translate3d(-1%, -1%, 0) scale(1);
+  }
+  100% {
+    background-position: 60% 65%;
+    transform: translate3d(1%, 2%, 0) scale(1.03);
   }
 }
