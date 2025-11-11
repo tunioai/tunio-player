@@ -293,7 +293,7 @@
   background-size: 120% 120%;
   background-repeat: no-repeat;
   filter: blur(4px) saturate(1.25);
-  opacity: 0.9;
+  opacity: 1;
   z-index: 0;
   animation: tunio-pan 22s ease-in-out infinite alternate;
   will-change: background-position, transform;
@@ -343,8 +343,9 @@
 
 .tunio-visualizer-station {
   font-size: clamp(40px, 6vw, 110px);
-  line-height: 1.05;
+  line-height: 1.1;
   font-weight: 700;
+  font-family: Tahoma;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.9);
 }
@@ -360,7 +361,7 @@
 .tunio-visualizer-title {
   font-size: clamp(32px, 5vw, 90px);
   line-height: clamp(32px, 5vw, 90px);
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .tunio-visualizer-text-change {

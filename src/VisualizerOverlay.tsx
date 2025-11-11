@@ -111,7 +111,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
         barLevelsRef.current = new Float32Array(barCount)
       }
       if (!peakYRef.current || peakYRef.current.length !== barCount) {
-        peakYRef.current = new Float32Array(barCount).fill(height) // изначально “упали” вниз
+        peakYRef.current = new Float32Array(barCount).fill(height) // initial position
       }
       if (!peakVelRef.current || peakVelRef.current.length !== barCount) {
         peakVelRef.current = new Float32Array(barCount) // 0
@@ -256,7 +256,9 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
       ? "tunio-visualizer-station tunio-visualizer-station-lg"
       : "tunio-visualizer-station"
 
-  const backdropUrl = `https://app.tunio.ai/api/d/image/stream-${name}.webp`
+  const backdropUrl = track?.is_music
+    ? `https://app.tunio.ai/api/d/audio-image/${track.uuid}.jpg`
+    : `https://app.tunio.ai/api/d/image/stream-${name}.webp`
 
   return (
     <div className="tunio-visualizer-overlay" role="dialog" aria-modal={true} onClick={onClose}>
