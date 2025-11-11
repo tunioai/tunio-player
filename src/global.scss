@@ -289,14 +289,15 @@
 .tunio-visualizer-backdrop {
   position: absolute;
   inset: 0;
-  background-position: 40% 45%;
-  background-size: 120% 120%;
+  background-position: center;
+  background-size: cover;
   background-repeat: no-repeat;
   filter: blur(4px) saturate(1.25);
-  opacity: 1;
+  opacity: 0.9;
   z-index: 0;
-  animation: tunio-pan 22s ease-in-out infinite alternate;
-  will-change: background-position, transform;
+
+  transform-origin: 50% 50%;
+  will-change: transform;
 }
 
 .tunio-visualizer-canvas {
