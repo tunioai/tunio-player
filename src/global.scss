@@ -292,8 +292,8 @@
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
-  filter: blur(10px) saturate(1.25);
-  opacity: 0.8;
+  filter: blur(4px) saturate(1.25);
+  opacity: 0.9;
   // transform: scale(1.05);
   z-index: 0;
 }
@@ -308,8 +308,13 @@
 
 .tunio-visualizer-watermark {
   position: absolute;
-  top: -40px;
+  top: -20vh;
   opacity: 0.9;
+
+  svg {
+    height: 24vh;
+    width: 13vw;
+  }
 }
 
 .tunio-visualizer-planet {
@@ -326,7 +331,7 @@
 
 .tunio-visualizer-info {
   position: absolute;
-  top: 12%;
+  top: 20%;
   left: 6%;
   z-index: 3;
   display: flex;

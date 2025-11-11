@@ -237,9 +237,9 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
         <div key={titleKey} className="tunio-visualizer-title tunio-visualizer-text-change">
           {title}
         </div>
-        <div key={artistKey} className="tunio-visualizer-artist tunio-visualizer-text-change">
+        {/* <div key={artistKey} className="tunio-visualizer-artist tunio-visualizer-text-change">
           {artist}
-        </div>
+        </div> */}
       </div>
     </div>
   )
