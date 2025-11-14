@@ -129,7 +129,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
         return
       }
 
-      // @ts-expect-error array data
+      // @ts-ignore
       analyser.getByteFrequencyData(dataArray)
       const width = canvas.width / DPR
       const height = canvas.height / DPR
