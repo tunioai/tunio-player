@@ -281,6 +281,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
 
   const stationLabel = stream?.title || "Tunio Radio"
   const title = track?.title || "Live stream"
+  const artist = track?.artist || "Tunio"
   const titleKey = `${stationLabel}-${title}`
   const normalizedStationLength = stationLabel.replace(/\s+/g, "").length
   const stationClassName =
@@ -307,6 +308,8 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
         <div key={titleKey} className="tunio-visualizer-title tunio-visualizer-text-change">
           {title}
         </div>
+
+        <div className="tunio-visualizer-artist tunio-visualizer-text-change">{artist}</div>
       </div>
 
       {/* <QRCode name={name} /> */}
