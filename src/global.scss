@@ -312,6 +312,7 @@
   position: absolute;
   top: -20vh;
   opacity: 0.9;
+  cursor: pointer;
 
   svg {
     height: 24vh;
@@ -337,7 +338,7 @@
   display: flex;
   flex-direction: column;
   gap: 60px;
-  max-width: 80%;
+  max-width: 70%;
   text-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
   opacity: 0.9;
 }
@@ -375,6 +376,21 @@
   bottom: -3px;
   right: 18px;
   z-index: 2;
+}
+
+.tunio-visualizer-qr-container {
+  position: absolute;
+  bottom: 25%;
+  right: 10%;
+  display: flex;
+  width: fit-content;
+  height: auto;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 20px;
+  padding: 1rem;
+  transform: rotate(-5deg);
+  opacity: 0.9;
+  z-index: 3;
 }
 
 @keyframes tunio-text-fade {

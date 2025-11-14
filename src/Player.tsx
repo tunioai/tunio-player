@@ -8,7 +8,7 @@ import WaterMark from "./WaterMark"
 import { PlayPauseButton } from "./buttons/PlayPause"
 import { MuteButton } from "./buttons/Mute"
 import { VisualizerButton } from "./buttons/VisualizerButton"
-import VisualizerOverlay from "./VisualizerOverlay"
+import VisualizerOverlay from "./Vizualizer/VisualizerOverlay"
 import type { TrackBackground, CurrentResponse, Track, Stream } from "./types"
 import type { Props } from "./PlayerTypes"
 
@@ -209,7 +209,6 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
       const isCurrentFullscreen = document.fullscreenElement === element
       if (!isCurrentFullscreen && fullscreenOwnerRef.current) {
         fullscreenOwnerRef.current = false
-        setIsVisualizerOpen(false)
       }
     }
 

@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useEffect, useRef, useCallback } from "react"
-import WaterMark from "./WaterMark"
-import type { Track, Stream } from "./types"
+import WaterMark from "../WaterMark"
+// import QRCode from "./QRCode"
+import type { Track, Stream } from "../types"
 
 type VisualizerOverlayProps = {
   isOpen: boolean
@@ -39,6 +40,34 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
   const barLevelsRef = useRef<Float32Array | null>(null)
   const peakYRef = useRef<Float32Array | null>(null)
   const peakVelRef = useRef<Float32Array | null>(null)
+
+  const exitFullscreen = useCallback((event?: Event | React.SyntheticEvent) => {
+    event?.preventDefault()
+    event?.stopPropagation()
+
+    if (typeof document === "undefined") return
+
+    const isFullscreenActive =
+      document.fullscreenElement ||
+      (document as Document & { webkitFullscreenElement?: Element | null }).webkitFullscreenElement ||
+      (document as Document & { msFullscreenElement?: Element | null }).msFullscreenElement
+
+    if (!isFullscreenActive) return
+
+    const exit =
+      document.exitFullscreen ||
+      (document as Document & { webkitExitFullscreen?: () => Promise<void> }).webkitExitFullscreen ||
+      (document as Document & { msExitFullscreen?: () => Promise<void> }).msExitFullscreen
+
+    if (!exit) return
+
+    try {
+      const result = exit.call(document)
+      if (result instanceof Promise) result.catch(() => undefined)
+    } catch (err) {
+      console.warn("Unable to exit fullscreen", err)
+    }
+  }, [])
 
   // backdrop zoom physics
   const BASE_ZOOM = 1.035
@@ -100,7 +129,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
         return
       }
 
-      // @ts-ignore
+      // @ts-expect-error array data
       analyser.getByteFrequencyData(dataArray)
       const width = canvas.width / DPR
       const height = canvas.height / DPR
@@ -240,12 +269,13 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
 
   useEffect(() => {
     if (!isOpen) return
+    exitFullscreen()
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isOpen, onClose])
+  }, [exitFullscreen, isOpen, onClose])
 
   if (!isOpen) return null
 
@@ -270,7 +300,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
       <canvas ref={canvasRef} className="tunio-visualizer-canvas" aria-hidden="true" />
       <div className="tunio-visualizer-planet" />
       <div className="tunio-visualizer-info">
-        <div className="tunio-visualizer-watermark">
+        <div className="tunio-visualizer-watermark" onClick={exitFullscreen}>
           <WaterMark height={30} color="#fff" />
         </div>
         <div className={stationClassName}>{stationLabel}</div>
@@ -278,6 +308,8 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
           {title}
         </div>
       </div>
+
+      {/* <QRCode name={name} /> */}
     </div>
   )
 }
