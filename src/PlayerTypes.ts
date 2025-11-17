@@ -3,4 +3,5 @@ export interface Props {
   name: string
   theme?: "dark" | "light"
   opacity?: number
+  visualizerOnly?: boolean
 }

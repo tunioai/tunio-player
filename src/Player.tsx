@@ -19,7 +19,7 @@ const generateUniqueId = () => `player_${Math.random().toString(36).substr(2, 9)
 const calculateBackgroundSize = (value: number, min: number, max: number) =>
   ((value - min) / (max - min)) * 100 + "% 100%"
 
-const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "dark" }) => {
+const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "dark", visualizerOnly = false }) => {
   const playerIdRef = useRef<string>(generateUniqueId())
   const playerRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLDivElement>(null)
@@ -38,10 +38,10 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
   const [isOverflowing, setIsOverflowing] = useState(false)
   const [textScrollDistance, setTextScrollDistance] = useState(0)
   const [streamsData, setStreamsData] = useState<Array<string>>([])
-  const [isVisualizerOpen, setIsVisualizerOpen] = useState(false)
+  const [isVisualizerOpen, setIsVisualizerOpen] = useState(visualizerOnly)
   const fullscreenOwnerRef = useRef(false)
 
-  const streams = useMemo(() => streamsData, [streamsData])
+  const streams = useMemo(() => (visualizerOnly ? [] : streamsData), [streamsData, visualizerOnly])
 
   const { isPlaying, volume, isMuted, buffering, setVolume, toggleMute, play, stop, audioRef } = useNativeAudio(streams)
 
@@ -194,13 +194,14 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
 
   const handleVisualizerOpen = useCallback(() => {
     setIsVisualizerOpen(true)
-    enterFullscreen()
-  }, [enterFullscreen])
+    if (!visualizerOnly) enterFullscreen()
+  }, [enterFullscreen, visualizerOnly])
 
   const handleVisualizerClose = useCallback(() => {
+    if (visualizerOnly) return
     setIsVisualizerOpen(false)
     exitFullscreen()
-  }, [exitFullscreen])
+  }, [exitFullscreen, visualizerOnly])
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -226,6 +227,12 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
       }
     }
   }, [exitFullscreen])
+
+  useEffect(() => {
+    if (visualizerOnly) {
+      setIsVisualizerOpen(true)
+    }
+  }, [visualizerOnly])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -312,46 +319,54 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
       ref={playerRef}
       className={clsx("tunio-player", { "tunio-theme-dark": theme === "dark", "tunio-theme-light": theme === "light" })}
     >
-      {ambient && coverURL && <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />}
-      <div className="tunio-player-wrapper" style={backgroundStyle}>
-        <Cover track={currentTrack} onImageLoad={onCoverImageLoad} />
-        <div className="tunio-container">
-          <div ref={titleContainerRef}>
-            <div ref={titleRef} className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`} style={scrollStyle}>
-              {currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "}
-            </div>
-          </div>
-          <div className="tunio-actions">
-            <PlayPauseButton
-              action={isPlaying ? "stop" : "play"}
-              onStop={handlePlayToggle}
-              onPlay={handlePlayToggle}
-              loading={buffering}
-            />
-            <MuteButton onClick={toggleMute} muted={isMuted} />
-            <VisualizerButton onClick={handleVisualizerOpen} />
-            <div className="tunio-native-range-wrapper">
-              <div className="tunio-native-range-container">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={volume}
-                  onChange={handleVolumeChange}
-                  className="tunio-native-range"
-                  style={{ backgroundSize: volumeBarBackgroundSize }}
+      {!visualizerOnly && (
+        <>
+          {ambient && coverURL && <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />}
+          <div className="tunio-player-wrapper" style={backgroundStyle}>
+            <Cover track={currentTrack} onImageLoad={onCoverImageLoad} />
+            <div className="tunio-container">
+              <div ref={titleContainerRef}>
+                <div
+                  ref={titleRef}
+                  className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}
+                  style={scrollStyle}
+                >
+                  {currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "}
+                </div>
+              </div>
+              <div className="tunio-actions">
+                <PlayPauseButton
+                  action={isPlaying ? "stop" : "play"}
+                  onStop={handlePlayToggle}
+                  onPlay={handlePlayToggle}
+                  loading={buffering}
                 />
+                <MuteButton onClick={toggleMute} muted={isMuted} />
+                <VisualizerButton onClick={handleVisualizerOpen} />
+                <div className="tunio-native-range-wrapper">
+                  <div className="tunio-native-range-container">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={volume}
+                      onChange={handleVolumeChange}
+                      className="tunio-native-range"
+                      style={{ backgroundSize: volumeBarBackgroundSize }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
+            <div className="tunio-player-watermark">
+              <WaterMark height={14} color={theme === "dark" ? "#fff" : "#000"} />
+            </div>
           </div>
-        </div>
-        <div className="tunio-player-watermark">
-          <WaterMark height={14} color={theme === "dark" ? "#fff" : "#000"} />
-        </div>
-      </div>
+        </>
+      )}
 
-      {isVisualizerOpen && (
+      {isVisualizerOpen && streamDetails?.title && (
         <VisualizerOverlay
           audioRef={audioRef}
           isOpen={isVisualizerOpen}

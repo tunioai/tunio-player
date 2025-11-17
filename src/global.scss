@@ -300,12 +300,22 @@
   will-change: transform;
 }
 
+.tunio-visualizer-backdrop--audio {
+  filter: blur(4px) saturate(1.3);
+}
+
+.tunio-visualizer-backdrop--ambient {
+  filter: blur(4px) saturate(1.1);
+  animation: tunio-pan 40s ease-in-out infinite alternate;
+  will-change: transform, background-position;
+}
+
 .tunio-visualizer-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.8;
+  opacity: 0.6;
 }
 
 .tunio-visualizer-watermark {
@@ -340,6 +350,7 @@
   max-width: 70%;
   text-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
   opacity: 0.9;
+  user-select: none;
 }
 
 .tunio-visualizer-station {
