@@ -71,7 +71,6 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
       if (!data || typeof data !== "object") return
       if (data.type !== "tunio-visualizer-update" || typeof data.payload !== "object") return
       const payload = data.payload as HostVisualizerPayload
-      alert(payload)
       setHostPayload(payload)
     }
 
