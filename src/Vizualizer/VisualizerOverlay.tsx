@@ -121,7 +121,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
           <div className="tunio-visualizer-planet" />
         </>
       ) : (
-        <VisualizerAmbientCanvas isOpen={isOpen} backdropRef={backdropRef} backdropUrl={backdropUrl} />
+        <VisualizerAmbientCanvas backdropRef={backdropRef} backdropUrl={backdropUrl} />
       )}
 
       <div className="tunio-visualizer-info">

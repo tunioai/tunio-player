@@ -306,7 +306,7 @@
 
 .tunio-visualizer-backdrop--ambient {
   filter: blur(4px) saturate(1.1);
-  animation: tunio-pan 40s ease-in-out infinite alternate;
+  animation: none;
   will-change: transform, background-position;
 }
 
@@ -348,7 +348,7 @@
   display: flex;
   flex-direction: column;
   max-width: 70%;
-  text-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
   opacity: 0.9;
   user-select: none;
 }
@@ -356,7 +356,7 @@
 .tunio-visualizer-station {
   font-size: clamp(40px, 6vw, 110px);
   line-height: 1.1;
-  font-weight: 700;
+  font-weight: 800;
   font-family: Tahoma;
   text-transform: uppercase;
 }
