@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+// import VisualizerAmbientLayers from "./VisualizerAmbientLayers"
 
 type VisualizerAmbientCanvasProps = {
   backdropRef: React.RefObject<HTMLDivElement | null>
@@ -14,8 +15,9 @@ const VisualizerAmbientCanvas: React.FC<VisualizerAmbientCanvasProps> = ({ backd
         ref={backdropRef}
         className="tunio-visualizer-backdrop tunio-visualizer-backdrop--ambient"
         style={{ backgroundImage: `url(${backdropUrl})` }}
-      />
-      <canvas className="tunio-visualizer-canvas" aria-hidden="true" />
+      >
+        {/* <VisualizerAmbientLayers /> */}
+      </div>
     </>
   )
 }

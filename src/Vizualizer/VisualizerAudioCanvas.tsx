@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef } from "react"
+import VisualizerAmbientLayers from "./VisualizerAmbientLayers"
 
 type AudioGraph = {
   context: AudioContext
@@ -228,7 +229,9 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({ isOpen, a
         ref={backdropRef}
         className="tunio-visualizer-backdrop tunio-visualizer-backdrop--audio"
         style={{ backgroundImage: `url(${backdropUrl})` }}
-      />
+      >
+        <VisualizerAmbientLayers />
+      </div>
       <canvas ref={canvasRef} className="tunio-visualizer-canvas" aria-hidden="true" />
     </>
   )

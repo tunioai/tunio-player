@@ -305,6 +305,7 @@
 
 .tunio-visualizer-backdrop--audio {
   filter: blur(4px) saturate(1.3);
+  overflow: hidden;
 }
 
 .tunio-visualizer-backdrop--ambient {
@@ -313,7 +314,9 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  filter: blur(9px) saturate(1.1);
+  filter: blur(11px) saturate(1.08);
+  background-size: 105%;
+  overflow: hidden;
   animation: none;
   will-change: transform, background-position;
 
@@ -324,8 +327,139 @@
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: #000000;
-    opacity: 0.2;
+    background-color: #22187b;
+    opacity: 0.18;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  &:before {
+    position: absolute;
+    content: "";
+    inset: -10%;
+    background: radial-gradient(circle at 20% 20%, rgba(0, 0, 0, 0.45), transparent 55%),
+      radial-gradient(circle at 65% 10%, rgba(0, 0, 0, 0.3), transparent 70%),
+      linear-gradient(120deg, rgba(0, 0, 0, 0.2), transparent 45%);
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+.tunio-visualizer-ambient-layers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.tunio-visualizer-ambient-layer {
+  position: absolute;
+  inset: 0;
+  --ambient-pan-duration: 26s;
+  --ambient-hue-duration: 44s;
+  --ambient-fade-duration: 42s;
+  --ambient-opacity-min: 0.22;
+  --ambient-opacity-max: 0.3;
+  opacity: var(--ambient-opacity-max);
+  background-repeat: no-repeat;
+  background-size: 140% 140%;
+  background-position: 15% 25%, 80% 15%, 45% 70%;
+  mix-blend-mode: color;
+  animation: tunio-ambient-shift var(--ambient-pan-duration) ease-in-out infinite,
+    tunio-ambient-hue var(--ambient-hue-duration) ease-in-out infinite,
+    tunio-ambient-fade var(--ambient-fade-duration) ease-in-out infinite;
+  animation-delay: var(--ambient-pan-delay, 0s), var(--ambient-hue-delay, 0s), var(--ambient-fade-delay, 0s);
+  will-change: background-position, filter, opacity;
+}
+
+.tunio-visualizer-ambient-layer--primary {
+  --ambient-pan-delay: -12s;
+  --ambient-hue-delay: -5s;
+  --ambient-fade-delay: -6s;
+  background-image: radial-gradient(circle at 25% 35%, rgba(255, 139, 96, 0.45), transparent 55%),
+    radial-gradient(circle at 70% 20%, rgba(255, 225, 168, 0.35), transparent 65%),
+    radial-gradient(circle at 40% 80%, rgba(171, 93, 255, 0.22), transparent 60%);
+}
+
+.tunio-visualizer-ambient-layer--secondary {
+  --ambient-opacity-min: 0.25;
+  --ambient-opacity-max: 0.1;
+  --ambient-pan-duration: 34s;
+  --ambient-hue-duration: 38s;
+  --ambient-fade-duration: 48s;
+  --ambient-pan-delay: -14s;
+  --ambient-hue-delay: -8s;
+  --ambient-fade-delay: -20s;
+  background-size: 140% 140%;
+  background-image: radial-gradient(circle at 75% 75%, rgba(120, 196, 255, 0.55), transparent 50%),
+    radial-gradient(circle at 15% 15%, rgba(91, 253, 255, 0.4), transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15), transparent 55%);
+  mix-blend-mode: color-dodge;
+}
+
+.tunio-visualizer-ambient-layer--soft {
+  --ambient-opacity-min: 0.15;
+  --ambient-opacity-max: 0.38;
+  --ambient-pan-duration: 40s;
+  --ambient-hue-duration: 52s;
+  --ambient-fade-duration: 60s;
+  --ambient-pan-delay: -4s;
+  --ambient-hue-delay: -18s;
+  --ambient-fade-delay: -12s;
+  background-size: 200px 200px;
+  background-image: linear-gradient(130deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 45%),
+    radial-gradient(circle at 30% 70%, rgba(255, 188, 235, 0.2), transparent 50%),
+    radial-gradient(circle at 80% 25%, rgba(179, 214, 255, 0.22), transparent 55%);
+  mix-blend-mode: soft-light;
+}
+
+@keyframes tunio-ambient-shift {
+  0% {
+    background-position: 15% 25%, 80% 15%, 45% 70%;
+  }
+  33% {
+    background-position: 60% 10%, 25% 75%, 70% 35%;
+  }
+  66% {
+    background-position: 30% 80%, 65% 20%, 15% 45%;
+  }
+  100% {
+    background-position: 15% 25%, 80% 15%, 45% 70%;
+  }
+}
+
+@keyframes tunio-ambient-hue {
+  0% {
+    filter: hue-rotate(-30deg) saturate(1.1) brightness(1.05);
+  }
+  40% {
+    filter: hue-rotate(12deg) saturate(1.3) brightness(1.08);
+  }
+  70% {
+    filter: hue-rotate(45deg) saturate(1.2) brightness(1.03);
+  }
+  100% {
+    filter: hue-rotate(5deg) saturate(1.15) brightness(1.05);
+  }
+}
+
+@keyframes tunio-ambient-fade {
+  0% {
+    opacity: calc(var(--ambient-opacity-min) + 0.05);
+  }
+  30% {
+    opacity: var(--ambient-opacity-max);
+  }
+  100% {
+    opacity: var(--ambient-opacity-min);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tunio-visualizer-ambient-layer {
+    animation: none;
   }
 }
 
@@ -377,7 +511,7 @@
 
 .tunio-visualizer-station {
   font-size: clamp(40px, 6vw, 110px);
-  line-height: 1.1;
+  line-height: 1;
   font-weight: 800;
   font-family: Tahoma;
   text-transform: uppercase;
