@@ -1,6 +1,9 @@
 .tunio-player {
   position: relative;
   width: 300px;
+  font-smooth: always;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 
   --player-widget-height: 80px;
   --player-widget-border-radius: 0.6rem;
@@ -305,9 +308,25 @@
 }
 
 .tunio-visualizer-backdrop--ambient {
-  filter: blur(4px) saturate(1.1);
+  position: relative;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  filter: blur(9px) saturate(1.1);
   animation: none;
   will-change: transform, background-position;
+
+  &:after {
+    position: absolute;
+    content: "";
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000000;
+    opacity: 0.2;
+  }
 }
 
 .tunio-visualizer-canvas {
@@ -351,6 +370,9 @@
   text-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
   opacity: 0.9;
   user-select: none;
+  font-smooth: always;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 .tunio-visualizer-station {
