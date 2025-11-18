@@ -3,13 +3,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import WaterMark from "../WaterMark"
 // import QRCode from "./QRCode"
-import type { Track, Stream } from "../types"
+import type { Track, Stream, TrackBackground } from "../types"
 import VisualizerAudioCanvas from "./VisualizerAudioCanvas"
 import VisualizerAmbientCanvas from "./VisualizerAmbientCanvas"
 
 type VisualizerOverlayProps = {
   isOpen: boolean
   onClose: () => void
+  trackBackground: TrackBackground | null
   audioRef: React.MutableRefObject<HTMLAudioElement | null>
   stream: Stream | null
   name: string
@@ -22,7 +23,15 @@ type HostVisualizerPayload = {
   station?: string
 }
 
-const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, audioRef, track, name, stream }) => {
+const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
+  isOpen,
+  onClose,
+  audioRef,
+  trackBackground,
+  track,
+  name,
+  stream
+}) => {
   const backdropRef = useRef<HTMLDivElement | null>(null)
   const [hostPayload, setHostPayload] = useState<HostVisualizerPayload | null>(null)
 
@@ -114,14 +123,18 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
         <>
           <VisualizerAudioCanvas
             isOpen={isOpen}
+            trackBackground={trackBackground}
             audioRef={audioRef}
             backdropRef={backdropRef}
             backdropUrl={backdropUrl}
           />
-          <div className="tunio-visualizer-planet" />
         </>
       ) : (
-        <VisualizerAmbientCanvas backdropRef={backdropRef} backdropUrl={backdropUrl} />
+        <VisualizerAmbientCanvas
+          backdropRef={backdropRef}
+          trackBackground={trackBackground}
+          backdropUrl={backdropUrl}
+        />
       )}
 
       <div className="tunio-visualizer-info">
@@ -133,7 +146,9 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({ isOpen, onClose, 
           {title}
         </div>
 
-        <div className="tunio-visualizer-artist tunio-visualizer-text-change">{artist}</div>
+        <div className="tunio-visualizer-artist tunio-visualizer-text-change" key={artist}>
+          {artist}
+        </div>
       </div>
 
       {/* <QRCode name={name} /> */}

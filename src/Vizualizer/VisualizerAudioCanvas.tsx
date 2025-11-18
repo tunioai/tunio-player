@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef } from "react"
 import VisualizerAmbientLayers from "./VisualizerAmbientLayers"
+import type { TrackBackground } from "../types"
 
 type AudioGraph = {
   context: AudioContext
@@ -23,32 +24,53 @@ type VisualizerAudioCanvasProps = {
   audioRef: React.MutableRefObject<HTMLAudioElement | null>
   backdropRef: React.RefObject<HTMLDivElement | null>
   backdropUrl: string
+  trackBackground: TrackBackground | null
 }
 
-const BAR_COUNT = 120
-const TRAIL_ALPHA = 0.08
-const PEAK_GRAVITY = 0.45
-const PEAK_BOOST = 6.0
-const PEAK_MIN_STEP = 0.8
-const CAP_MIN = 2
-const CAP_MAX = 4
-const BASE_ZOOM = 1.035
-const ZOOM_FROM_BASS = 0.045
-const SPRING_K = 0.12
-const DAMPING = 0.1
+const BAR_COUNT = 50
 
-const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({ isOpen, audioRef, backdropRef, backdropUrl }) => {
+// simple peak-cap physics
+const PEAK_FALL_SPEED = 3 // px per frame when bar is lower
+const PEAK_TRIGGER_DELTA = 2 // minimal diff to move peak up
+
+const CAP_MIN = 0.1
+const CAP_MAX = 4
+
+const MAX_DPR = 1.5 // clamp DPR to avoid huge canvases on Retina
+
+const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
+  isOpen,
+  audioRef,
+  backdropRef,
+  backdropUrl,
+  trackBackground
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationFrameRef = useRef<number | null>(null)
+
   const analyserRef = useRef<AnalyserNode | null>(null)
   const dataArrayRef = useRef<Uint8Array | null>(null)
+
   const barLevelsRef = useRef<Float32Array | null>(null)
   const peakYRef = useRef<Float32Array | null>(null)
-  const peakVelRef = useRef<Float32Array | null>(null)
-  const zoomRef = useRef({ zoom: BASE_ZOOM, zoomVel: 0, bassSmooth: 0 })
+
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null)
+  const resizeRafRef = useRef<number | null>(null)
+  const pulseFrameRef = useRef(0)
+
+  // Background image state
+  const bgImageRef = useRef<HTMLImageElement | null>(null)
+  const bgReadyRef = useRef(false)
+
+  // Precomputed lookup tables for indices and floor values per bar
+  const lutRef = useRef<{
+    bucketIndex: Uint16Array
+    mirroredIndex: Uint16Array
+    floorValue: Float32Array
+  } | null>(null)
 
   const stopAnimation = useCallback(() => {
-    if (animationFrameRef.current) {
+    if (animationFrameRef.current != null) {
       cancelAnimationFrame(animationFrameRef.current)
       animationFrameRef.current = null
     }
@@ -56,16 +78,56 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({ isOpen, a
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current
+    const ctx = ctxRef.current
     if (!canvas) return
-    const DPR = typeof window !== "undefined" ? Math.max(1, window.devicePixelRatio || 1) : 1
+
+    const DPR = typeof window !== "undefined" ? Math.min(MAX_DPR, Math.max(1, window.devicePixelRatio || 1)) : 1
+
     const { innerWidth, innerHeight } = window
+
+    // CSS size
     canvas.style.width = `${innerWidth}px`
     canvas.style.height = `${innerHeight}px`
+
+    // Internal buffer size
     canvas.width = Math.floor(innerWidth * DPR)
     canvas.height = Math.floor(innerHeight * DPR)
-    const ctx = canvas.getContext("2d")
-    if (ctx) ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
+
+    if (ctx) {
+      // Normalize coordinates back to CSS pixels
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
+    }
   }, [])
+
+  // Load / reload background image when URL changes
+  useEffect(() => {
+    const src = backdropUrl
+    if (!src) {
+      bgImageRef.current = null
+      bgReadyRef.current = false
+      return
+    }
+
+    const img = new Image()
+    img.crossOrigin = "anonymous" // safe default for remote images
+    img.src = src
+    bgReadyRef.current = false
+
+    img.onload = () => {
+      bgImageRef.current = img
+      bgReadyRef.current = true
+    }
+
+    img.onerror = () => {
+      bgImageRef.current = null
+      bgReadyRef.current = false
+    }
+
+    return () => {
+      bgImageRef.current = null
+      bgReadyRef.current = false
+    }
+  }, [backdropUrl, trackBackground])
 
   useEffect(() => {
     if (!isOpen) {
@@ -75,53 +137,171 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({ isOpen, a
 
     const canvas = canvasRef.current
     if (!canvas) return
+
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+    ctxRef.current = ctx
+
     resizeCanvas()
 
-    const handleResize = () => resizeCanvas()
+    // Throttled resize handler
+    const handleResize = () => {
+      if (resizeRafRef.current != null) return
+      resizeRafRef.current = requestAnimationFrame(() => {
+        resizeCanvas()
+        resizeRafRef.current = null
+      })
+    }
+
     window.addEventListener("resize", handleResize)
 
+    // Draw function: draws a single frame. Scheduling is handled separately.
     const draw = () => {
-      const ctx = canvas.getContext("2d")
+      const ctx = ctxRef.current
       const analyser = analyserRef.current
       const dataArray = dataArrayRef.current
-      if (!ctx || !analyser || !dataArray) {
-        animationFrameRef.current = requestAnimationFrame(draw)
+      const audioElement = audioRef.current
+
+      // Stop if component is closed, audio is not playing, or page is hidden
+      if (!isOpen || !ctx || !analyser || !dataArray || !audioElement || audioElement.paused || document.hidden) {
+        stopAnimation()
+        return
+      }
+
+      const canvas = canvasRef.current
+      if (!canvas) {
+        stopAnimation()
         return
       }
 
       // @ts-ignore
       analyser.getByteFrequencyData(dataArray)
-      const DPR = typeof window !== "undefined" ? Math.max(1, window.devicePixelRatio || 1) : 1
+
+      const DPR = typeof window !== "undefined" ? Math.min(MAX_DPR, Math.max(1, window.devicePixelRatio || 1)) : 1
+
       const width = canvas.width / DPR
       const height = canvas.height / DPR
 
-      ctx.fillStyle = `rgba(8, 12, 26, ${TRAIL_ALPHA})`
+      // 1) Clear canvas fully each frame
+      ctx.clearRect(0, 0, width, height)
+
+      // 2) Draw blurred background image (cover)
+      const bgImg = bgImageRef.current
+      if (bgImg && bgReadyRef.current) {
+        ctx.save()
+
+        const imgRatio = bgImg.width / bgImg.height
+        const canvasRatio = width / height
+
+        let drawWidth: number
+        let drawHeight: number
+        let drawX: number
+        let drawY: number
+
+        // cover logic
+        if (imgRatio > canvasRatio) {
+          // image is wider than canvas
+          drawHeight = height
+          drawWidth = height * imgRatio
+          drawX = (width - drawWidth) / 2
+          drawY = 0
+        } else {
+          // image is taller than canvas
+          drawWidth = width
+          drawHeight = width / imgRatio
+          drawX = 0
+          drawY = (height - drawHeight) / 2
+        }
+
+        const blurRadius = 10
+        ctx.filter = `blur(${blurRadius}px)`
+        ctx.drawImage(bgImg, drawX, drawY, drawWidth, drawHeight)
+        ctx.filter = "none"
+
+        ctx.save()
+        ctx.globalCompositeOperation = "multiply"
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)" // ← adjust darkness here
+        ctx.fillRect(0, 0, width, height)
+        ctx.restore()
+
+        // Soft vignette on top of blurred background
+        ctx.save()
+
+        ctx.globalCompositeOperation = "multiply"
+
+        const vignetteGradient = ctx.createRadialGradient(
+          width / 2, // center X
+          height / 2, // center Y
+          Math.min(width, height) * 0.25, // inner radius (no darkening)
+          width / 2,
+          height / 2,
+          Math.max(width, height) * 0.75 // outer radius (max darkening)
+        )
+
+        // inner circle (center)
+        vignetteGradient.addColorStop(0, "rgba(0,0,0,0.0)") // no darkening in center
+        // middle falloff
+        vignetteGradient.addColorStop(0.6, "rgba(0,0,0,0.05)")
+        // edges
+        vignetteGradient.addColorStop(1, "rgba(0,0,0,0.4)") // darker at edges
+
+        ctx.fillStyle = vignetteGradient
+        ctx.fillRect(0, 0, width, height)
+
+        ctx.restore()
+      } else {
+        // fallback background if image not ready
+        ctx.fillStyle = "#050712"
+        ctx.fillRect(0, 0, width, height)
+      }
+
+      // 3) Color overlay on top of blurred image
+      ctx.save()
+      const overlayColor = `rgba(${trackBackground?.r}, ${trackBackground?.g}, ${trackBackground?.b}, 0.1)`
+      ctx.fillStyle = overlayColor
       ctx.fillRect(0, 0, width, height)
+      ctx.restore()
 
       const barWidth = width / BAR_COUNT
+
       if (!barLevelsRef.current || barLevelsRef.current.length !== BAR_COUNT)
         barLevelsRef.current = new Float32Array(BAR_COUNT)
       if (!peakYRef.current || peakYRef.current.length !== BAR_COUNT)
         peakYRef.current = new Float32Array(BAR_COUNT).fill(height)
-      if (!peakVelRef.current || peakVelRef.current.length !== BAR_COUNT)
-        peakVelRef.current = new Float32Array(BAR_COUNT)
 
       const barLevels = barLevelsRef.current
       const peakY = peakYRef.current
-      const peakVel = peakVelRef.current
+
+      const binCount = dataArray.length
+
+      // Use precomputed LUTs when available
+      const lut = lutRef.current
+
+      // Single shared gradient for all bars per frame (cheaper than 50 gradients)
+      const barGradient = ctx.createLinearGradient(0, height, 0, 0)
+      barGradient.addColorStop(0, "rgba(64, 169, 255, 0.50)")
+      barGradient.addColorStop(0.4, "rgba(120, 200, 255, 0.70)")
+      barGradient.addColorStop(1, `rgba(${trackBackground?.r}, ${trackBackground?.g}, ${trackBackground?.b}, 1)`)
 
       for (let i = 0; i < BAR_COUNT; i++) {
-        const proportion = i / Math.max(1, BAR_COUNT - 1)
-        const curved = Math.pow(proportion, 0.85)
-        const bucketIndex = Math.min(Math.floor(curved * (dataArray.length - 1)), dataArray.length - 1)
-        const rawValue = dataArray[bucketIndex] / 255
+        let bucketIndex: number
+        let mirroredIndex: number
+        let floorValue: number
 
-        const mirroredIndex = Math.min(
-          Math.floor((1 - proportion * 0.6) * (dataArray.length - 1)),
-          dataArray.length - 1,
-        )
+        if (lut) {
+          bucketIndex = lut.bucketIndex[i]
+          mirroredIndex = lut.mirroredIndex[i]
+          floorValue = lut.floorValue[i]
+        } else {
+          const proportion = i / Math.max(1, BAR_COUNT - 1)
+          const curved = Math.pow(proportion, 0.85)
+          bucketIndex = Math.min(Math.floor(curved * (binCount - 1)), binCount - 1)
+          mirroredIndex = Math.min(Math.floor((1 - proportion * 0.6) * (binCount - 1)), binCount - 1)
+          floorValue = 0.08 + (1 - proportion) * 0.05
+        }
+
+        const rawValue = dataArray[bucketIndex] / 255
         const mirrored = dataArray[mirroredIndex] / 255
-        const floorValue = 0.08 + (1 - proportion) * 0.05
         const blended = rawValue * 0.55 + mirrored * 0.35
         const target = Math.min(1, blended + floorValue)
         const eased = barLevels[i] * 0.945 + target * 0.055
@@ -132,54 +312,57 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({ isOpen, a
         const x = i * barWidth
         const yTop = height - barHeight
 
-        const gradient = ctx.createLinearGradient(x, height, x, yTop)
-        gradient.addColorStop(0, "rgba(64, 169, 255, 0)")
-        gradient.addColorStop(0.4, "rgba(120, 200, 255, 0.4)")
-        gradient.addColorStop(1, "rgba(194, 163, 255, 0.9)")
-        ctx.fillStyle = gradient
+        // Bars
+        ctx.fillStyle = barGradient
         ctx.fillRect(x + barWidth * 0.3, yTop, barWidth * 0.4, barHeight)
 
-        const currentPeakY = peakY[i]
-        if (yTop < currentPeakY - 1) {
-          peakY[i] = yTop
-          peakVel[i] = PEAK_BOOST
-        } else {
-          peakVel[i] = Math.max(PEAK_MIN_STEP, peakVel[i] - PEAK_GRAVITY)
-          peakY[i] = Math.min(height, currentPeakY + peakVel[i])
+        // Simple peak cap: snaps up instantly, falls down with constant speed
+        let currentPeakY = peakY[i]
+
+        if (yTop < currentPeakY - PEAK_TRIGGER_DELTA) {
+          // bar went significantly higher → snap cap to bar top
+          currentPeakY = yTop
+        } else if (yTop > currentPeakY) {
+          // bar is below peak → let the cap fall down smoothly
+          currentPeakY = Math.min(yTop, currentPeakY + PEAK_FALL_SPEED)
         }
+
+        peakY[i] = currentPeakY
 
         const capH = Math.max(CAP_MIN, Math.min(CAP_MAX, barWidth * 0.25))
         ctx.fillStyle = "rgba(255,255,255,0.95)"
-        ctx.fillRect(x + barWidth * 0.28, Math.max(0, peakY[i] - capH), barWidth * 0.44, capH)
+        ctx.fillRect(x + barWidth * 0.28, Math.max(0, currentPeakY - capH), barWidth * 0.44, capH)
       }
 
-      const dataArrayIndex = Math.min(5, dataArray.length - 1)
+      // Bass pulse ring — render less frequently to reduce blend cost
+      const dataArrayIndex = Math.min(5, binCount - 1)
       const bassValue = dataArray[dataArrayIndex] / 255
       const pulseRadius = 180 + bassValue * 140
       const hue = 210 + bassValue * 25
 
-      ctx.save()
-      ctx.globalCompositeOperation = "screen"
-      ctx.beginPath()
-      ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.15)`
-      ctx.lineWidth = 1.5
-      ctx.shadowBlur = 30
-      ctx.shadowColor = `hsla(${hue}, 80%, 65%, 0.5)`
-      ctx.arc(width / 2, height / 2, pulseRadius, 0, Math.PI * 2)
-      ctx.stroke()
-      ctx.restore()
+      pulseFrameRef.current += 1
+      if (pulseFrameRef.current % 3 === 0) {
+        ctx.save()
+        ctx.globalCompositeOperation = "screen"
+        ctx.beginPath()
+        ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.8)`
+        ctx.lineWidth = 2
+        ctx.arc(width / 2, height / 2, pulseRadius, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.restore()
+      }
+    }
 
-      const zoomState = zoomRef.current
-      zoomState.bassSmooth = zoomState.bassSmooth * 0.88 + bassValue * 0.12
-      const targetZoom = BASE_ZOOM + zoomState.bassSmooth * ZOOM_FROM_BASS
-      const accel = (targetZoom - zoomState.zoom) * SPRING_K - zoomState.zoomVel * DAMPING
-      zoomState.zoomVel += accel
-      zoomState.zoom += zoomState.zoomVel
-      zoomState.zoom = Math.min(1.14, Math.max(1.02, zoomState.zoom))
-      const bd = backdropRef.current
-      if (bd) bd.style.transform = `scale(${zoomState.zoom})`
-
-      animationFrameRef.current = requestAnimationFrame(draw)
+    const startAnimation = () => {
+      // Avoid multiple concurrent RAF loops
+      if (animationFrameRef.current != null) return
+      animationFrameRef.current = requestAnimationFrame(function loop() {
+        draw()
+        // draw() may cancel RAF via stopAnimation(); check before rescheduling
+        if (animationFrameRef.current != null) {
+          animationFrameRef.current = requestAnimationFrame(loop)
+        }
+      })
     }
 
     const setupAudioGraph = async () => {
@@ -212,25 +395,79 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({ isOpen, a
 
       analyserRef.current = graph.analyser
       dataArrayRef.current = graph.dataArray
-      draw()
+
+      // Precompute LUTs once per audio graph
+      const binCount = graph.dataArray.length
+      const bucketIndex = new Uint16Array(BAR_COUNT)
+      const mirroredIndex = new Uint16Array(BAR_COUNT)
+      const floorValue = new Float32Array(BAR_COUNT)
+
+      for (let i = 0; i < BAR_COUNT; i++) {
+        const proportion = i / Math.max(1, BAR_COUNT - 1)
+        const curved = Math.pow(proportion, 0.85)
+        bucketIndex[i] = Math.min(Math.floor(curved * (binCount - 1)), binCount - 1)
+        mirroredIndex[i] = Math.min(Math.floor((1 - proportion * 0.6) * (binCount - 1)), binCount - 1)
+        floorValue[i] = 0.08 + (1 - proportion) * 0.05
+      }
+
+      lutRef.current = { bucketIndex, mirroredIndex, floorValue }
+
+      // Start animation only when audio is actually playing
+      if (!audioElement.paused && !document.hidden) {
+        startAnimation()
+      }
+    }
+
+    // Visibility handler to pause/resume animation
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopAnimation()
+      } else {
+        const audioElement = audioRef.current
+        if (audioElement && !audioElement.paused && isOpen) {
+          startAnimation()
+        }
+      }
+    }
+
+    // Audio play/pause handlers
+    const audioElement = audioRef.current
+    const handleAudioPlay = () => {
+      if (!document.hidden && isOpen) {
+        startAnimation()
+      }
+    }
+    const handleAudioPause = () => {
+      stopAnimation()
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    if (audioElement) {
+      audioElement.addEventListener("play", handleAudioPlay)
+      audioElement.addEventListener("pause", handleAudioPause)
     }
 
     setupAudioGraph()
 
     return () => {
       window.removeEventListener("resize", handleResize)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      if (audioElement) {
+        audioElement.removeEventListener("play", handleAudioPlay)
+        audioElement.removeEventListener("pause", handleAudioPause)
+      }
+      if (resizeRafRef.current != null) {
+        cancelAnimationFrame(resizeRafRef.current)
+        resizeRafRef.current = null
+      }
       stopAnimation()
     }
-  }, [audioRef, backdropRef, isOpen, resizeCanvas, stopAnimation])
+  }, [audioRef, backdropRef, isOpen, resizeCanvas, stopAnimation, backdropUrl, trackBackground])
 
   return (
     <>
-      <div
-        ref={backdropRef}
-        className="tunio-visualizer-backdrop tunio-visualizer-backdrop--audio"
-        style={{ backgroundImage: `url(${backdropUrl})` }}
-      >
-        <VisualizerAmbientLayers />
+      <div className="tunio-visualizer-backdrop tunio-visualizer-backdrop--audio">
+        {/* <VisualizerAmbientLayers /> */}
       </div>
       <canvas ref={canvasRef} className="tunio-visualizer-canvas" aria-hidden="true" />
     </>
