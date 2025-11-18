@@ -1,6 +1,6 @@
 export interface Props {
+  id: string
   ambient?: boolean
-  name: string
   theme?: "dark" | "light"
   opacity?: number
   visualizerOnly?: boolean

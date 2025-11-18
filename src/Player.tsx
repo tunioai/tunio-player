@@ -3,13 +3,13 @@
 import clsx from "clsx"
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Cover } from "./Cover"
-import { getDominantColor } from "./helper"
+import { getDominantColor, fetchPlayerConfig } from "./helper"
 import WaterMark from "./WaterMark"
 import { PlayPauseButton } from "./buttons/PlayPause"
 import { MuteButton } from "./buttons/Mute"
 import { VisualizerButton } from "./buttons/VisualizerButton"
 import VisualizerOverlay from "./Vizualizer/VisualizerOverlay"
-import type { TrackBackground, CurrentResponse, Track, Stream } from "./types"
+import type { TrackBackground, CurrentResponse, Track, Stream, StreamConfig } from "./types"
 import type { Props } from "./PlayerTypes"
 
 import useNativeAudio from "./hooks/useNativeAudio"
@@ -19,14 +19,14 @@ const generateUniqueId = () => `player_${Math.random().toString(36).substr(2, 9)
 const calculateBackgroundSize = (value: number, min: number, max: number) =>
   ((value - min) / (max - min)) * 100 + "% 100%"
 
-const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "dark", visualizerOnly = false }) => {
+const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "dark", visualizerOnly = false }) => {
   const playerIdRef = useRef<string>(generateUniqueId())
   const playerRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLDivElement>(null)
   const titleContainerRef = useRef<HTMLDivElement>(null)
   const currentTrackUpdateInterval = useRef<NodeJS.Timeout | null>(null)
   const initialLoadingRef = useRef<boolean>(true)
-  const previousNameRef = useRef<string | undefined>(undefined)
+  const previousIDRef = useRef<string | undefined>(undefined)
   const streamsDataRef = useRef<Array<string>>([])
   const checkOverflowTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -34,6 +34,7 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
   const [bgColor, setBgColor] = useState<TrackBackground | null>(null)
   const [currentTrack, setCurrentTrack] = useState<Track | undefined>(undefined)
   const [streamDetails, setStreamDetails] = useState<Stream | null>(null)
+  const [streamConfig, setStreamConfig] = useState<StreamConfig | null>(null)
   const [coverURL, setCoverURL] = useState<string | null>(null)
   const [isOverflowing, setIsOverflowing] = useState(false)
   const [textScrollDistance, setTextScrollDistance] = useState(0)
@@ -73,18 +74,24 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
     setBgColor(getDominantColor(image))
   }, [])
 
-  const fetchCurrentTrack = useCallback(() => {
-    if (!name) return
+  const fetchStreamConfig = useCallback(
+    async (abort: AbortController) => {
+      const data = await fetchPlayerConfig(id, abort)
+      setStreamConfig(data)
+    },
+    [id]
+  )
 
+  const fetchCurrentTrack = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
 
     abortControllerRef.current = new AbortController()
 
-    const fetchData = async () => {
+    const fetchCurrentTrack = async () => {
       try {
-        const response = await fetch(`https://app.tunio.ai/api/radio/${name}/current`, {
+        const response = await fetch(`https://api.tunio.ai/v1/stream/${id}/current`, {
           headers: {
             "Content-Type": "application/json",
             "Accept": "application/json"
@@ -121,8 +128,9 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
       }
     }
 
-    fetchData()
-  }, [name, checkOverflow])
+    fetchCurrentTrack()
+    fetchStreamConfig(abortControllerRef.current)
+  }, [id, checkOverflow])
 
   const handleVolumeChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,9 +257,9 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
   }, [isPlaying, stop])
 
   useEffect(() => {
-    if (previousNameRef.current === name) return
+    if (previousIDRef.current === id) return
 
-    previousNameRef.current = name
+    previousIDRef.current = id
 
     if (currentTrackUpdateInterval.current) {
       clearInterval(currentTrackUpdateInterval.current)
@@ -274,13 +282,14 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
     setCurrentTrack(undefined)
     streamsDataRef.current = []
     setStreamsData([])
+    setStreamConfig(null)
 
-    if (!name) return
+    if (!id) return
 
     initialLoadingRef.current = true
     fetchCurrentTrack()
     currentTrackUpdateInterval.current = setInterval(fetchCurrentTrack, 15_000)
-  }, [name, isPlaying, stop, fetchCurrentTrack])
+  }, [id, isPlaying, stop, fetchCurrentTrack])
 
   useEffect(() => {
     window.addEventListener("resize", checkOverflow)
@@ -314,6 +323,8 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
     [isOverflowing, textScrollDistance]
   )
 
+  if (!streamConfig) return null
+
   return (
     <div
       ref={playerRef}
@@ -322,7 +333,7 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
       <div className={`tunio-player-body ${visualizerOnly && "tunio-player-body--hidden"}`}>
         {ambient && coverURL && <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />}
         <div className="tunio-player-wrapper" style={backgroundStyle}>
-          <Cover track={currentTrack} onImageLoad={onCoverImageLoad} />
+          <Cover track={currentTrack} streamConfig={streamConfig} onImageLoad={onCoverImageLoad} />
           <div className="tunio-container">
             <div ref={titleContainerRef}>
               <div
@@ -358,21 +369,24 @@ const Player: React.FC<Props> = ({ name, opacity = 1, ambient = false, theme = "
               </div>
             </div>
           </div>
-          <div className="tunio-player-watermark">
-            <WaterMark height={14} color={theme === "dark" ? "#fff" : "#000"} />
-          </div>
+          {streamConfig.wetermark && (
+            <div className="tunio-player-watermark">
+              <WaterMark height={14} color={theme === "dark" ? "#fff" : "#000"} />
+            </div>
+          )}
         </div>
       </div>
 
       {isVisualizerOpen && streamDetails?.title && (
         <VisualizerOverlay
           trackBackground={bgColor}
+          coverURL={coverURL}
           audioRef={audioRef}
           isOpen={isVisualizerOpen}
           onClose={handleVisualizerClose}
           track={currentTrack}
           stream={streamDetails}
-          name={name}
+          streamConfig={streamConfig}
         />
       )}
     </div>

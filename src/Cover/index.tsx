@@ -1,12 +1,13 @@
 import React, { useState } from "react"
-import type { Track } from "../types"
+import type { StreamConfig, Track } from "../types"
 
 interface Props {
   track: Track | undefined
+  streamConfig: StreamConfig
   onImageLoad: (image: HTMLImageElement, imageUrl: string, valid: boolean) => void
 }
 
-export const Cover: React.FC<Props> = ({ track, onImageLoad }) => {
+export const Cover: React.FC<Props> = ({ track, streamConfig, onImageLoad }) => {
   const [coverImage, setCoverImage] = useState<string | null>(null)
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -20,7 +21,7 @@ export const Cover: React.FC<Props> = ({ track, onImageLoad }) => {
       return
     }
 
-    const imageUrl = `https://app.tunio.ai/api/d/image/streams_section.webp`
+    const imageUrl = `https://app.tunio.ai/api/d/image/stream-${streamConfig.stream_name}.webp`
     setCoverImage(imageUrl)
     onImageLoad(img, imageUrl, isValid)
   }

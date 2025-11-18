@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import WaterMark from "../WaterMark"
 // import QRCode from "./QRCode"
-import type { Track, Stream, TrackBackground } from "../types"
+import type { Track, Stream, TrackBackground, StreamConfig } from "../types"
 import VisualizerAudioCanvas from "./VisualizerAudioCanvas"
 import VisualizerAmbientCanvas from "./VisualizerAmbientCanvas"
 
@@ -13,8 +13,9 @@ type VisualizerOverlayProps = {
   trackBackground: TrackBackground | null
   audioRef: React.MutableRefObject<HTMLAudioElement | null>
   stream: Stream | null
-  name: string
+  streamConfig: StreamConfig | null
   track?: Track
+  coverURL: string | null
 }
 
 type HostVisualizerPayload = {
@@ -29,8 +30,9 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
   audioRef,
   trackBackground,
   track,
-  name,
-  stream
+  streamConfig,
+  stream,
+  coverURL
 }) => {
   const backdropRef = useRef<HTMLDivElement | null>(null)
   const [hostPayload, setHostPayload] = useState<HostVisualizerPayload | null>(null)
@@ -74,6 +76,10 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
     onClose()
   }
 
+  const getBackdropUrl = () => {
+    return coverURL || `https://cp.tunio.ai/api/d/image/stream-${streamConfig?.stream_name}.web`
+  }
+
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const data = event.data
@@ -101,7 +107,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
 
   if (!isOpen) return null
 
-  const stationLabel = hostPayload?.station?.trim() || stream?.title || name || "Tunio Radio"
+  const stationLabel = hostPayload?.station?.trim() || stream?.title || streamConfig?.stream_name || "Tunio Radio"
   const title = hostPayload?.title?.trim() || track?.title || "Live stream"
   const artist = hostPayload?.artist?.trim() || track?.artist || "Tunio"
   const titleKey = `${stationLabel}-${title}`
@@ -113,10 +119,6 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
       ? "tunio-visualizer-station tunio-visualizer-station-lg"
       : "tunio-visualizer-station"
 
-  const backdropUrl = track?.is_music
-    ? `https://app.tunio.ai/api/d/audio-image/${track.uuid}.jpg`
-    : `https://app.tunio.ai/api/d/image/stream-${name}.webp`
-
   return (
     <div className="tunio-visualizer-overlay" role="dialog" aria-modal={true} onClick={onCloseHandler}>
       {!isEmbedded ? (
@@ -126,22 +128,26 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
             trackBackground={trackBackground}
             audioRef={audioRef}
             backdropRef={backdropRef}
-            backdropUrl={backdropUrl}
+            backdropUrl={getBackdropUrl()}
           />
         </>
       ) : (
         <VisualizerAmbientCanvas
           backdropRef={backdropRef}
           trackBackground={trackBackground}
-          backdropUrl={backdropUrl}
+          backdropUrl={getBackdropUrl()}
         />
       )}
 
       <div className="tunio-visualizer-info">
-        <div className="tunio-visualizer-watermark" onClick={exitFullscreen}>
-          <WaterMark height={30} color="#fff" />
+        {streamConfig?.wetermark && (
+          <div className="tunio-visualizer-watermark">
+            <WaterMark height={30} color="#fff" />
+          </div>
+        )}
+        <div className={stationClassName} onClick={exitFullscreen}>
+          {stationLabel}
         </div>
-        <div className={stationClassName}>{stationLabel}</div>
         <div key={titleKey} className="tunio-visualizer-title tunio-visualizer-text-change">
           {title}
         </div>

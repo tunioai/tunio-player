@@ -7,6 +7,11 @@ export interface Track {
   uuid: string
 }
 
+export interface StreamConfig {
+  wetermark: boolean
+  stream_name: string
+}
+
 export interface TrackBackground {
   r: number
   g: number

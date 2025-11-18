@@ -101,6 +101,7 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
   // Load / reload background image when URL changes
   useEffect(() => {
     const src = backdropUrl
+
     if (!src) {
       bgImageRef.current = null
       bgReadyRef.current = false
@@ -256,7 +257,10 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
 
       // 3) Color overlay on top of blurred image
       ctx.save()
-      const overlayColor = `rgba(${trackBackground?.r}, ${trackBackground?.g}, ${trackBackground?.b}, 0.1)`
+
+      const overlayColor = trackBackground
+        ? `rgba(${trackBackground?.r}, ${trackBackground?.g}, ${trackBackground?.b}, 0.1)`
+        : "rgba(0,0,0,0.2)"
       ctx.fillStyle = overlayColor
       ctx.fillRect(0, 0, width, height)
       ctx.restore()
@@ -280,7 +284,12 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
       const barGradient = ctx.createLinearGradient(0, height, 0, 0)
       barGradient.addColorStop(0, "rgba(64, 169, 255, 0.50)")
       barGradient.addColorStop(0.4, "rgba(120, 200, 255, 0.70)")
-      barGradient.addColorStop(1, `rgba(${trackBackground?.r}, ${trackBackground?.g}, ${trackBackground?.b}, 1)`)
+
+      if (trackBackground) {
+        barGradient.addColorStop(1, `rgba(${trackBackground?.r}, ${trackBackground?.g}, ${trackBackground?.b}, 1)`)
+      } else {
+        barGradient.addColorStop(1, "rgba(1, 92, 152, 1)")
+      }
 
       for (let i = 0; i < BAR_COUNT; i++) {
         let bucketIndex: number

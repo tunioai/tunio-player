@@ -1,3 +1,5 @@
+import type { StreamConfig } from "./types"
+
 interface Color {
   r: number
   g: number
@@ -51,5 +53,25 @@ export const lightenColor = (color: Color, percent: number) => {
     r: lighten(color.r),
     g: lighten(color.g),
     b: lighten(color.b)
+  }
+}
+
+export const fetchPlayerConfig = async (id: string, abort: AbortController | null): Promise<StreamConfig | null> => {
+  try {
+    const response = await fetch(`https://api.tunio.ai/v1/stream/${id}/player-config`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      keepalive: true,
+      signal: abort?.signal
+    })
+    const data: StreamConfig = await response.json()
+
+    if (!data.stream_name) return null
+
+    return data
+  } catch {
+    return null
   }
 }
