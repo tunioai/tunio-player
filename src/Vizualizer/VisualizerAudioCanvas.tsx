@@ -229,25 +229,6 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
 
         ctx.globalCompositeOperation = "multiply"
 
-        const vignetteGradient = ctx.createRadialGradient(
-          width / 2, // center X
-          height / 2, // center Y
-          Math.min(width, height) * 0.25, // inner radius (no darkening)
-          width / 2,
-          height / 2,
-          Math.max(width, height) * 0.75 // outer radius (max darkening)
-        )
-
-        // inner circle (center)
-        vignetteGradient.addColorStop(0, "rgba(0,0,0,0.0)") // no darkening in center
-        // middle falloff
-        vignetteGradient.addColorStop(0.6, "rgba(0,0,0,0.05)")
-        // edges
-        vignetteGradient.addColorStop(1, "rgba(0,0,0,0.4)") // darker at edges
-
-        ctx.fillStyle = vignetteGradient
-        ctx.fillRect(0, 0, width, height)
-
         ctx.restore()
       } else {
         // fallback background if image not ready
@@ -257,13 +238,6 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
 
       // 3) Color overlay on top of blurred image
       ctx.save()
-
-      const overlayColor = trackBackground
-        ? `rgba(${trackBackground?.r}, ${trackBackground?.g}, ${trackBackground?.b}, 0.1)`
-        : "rgba(0,0,0,0.2)"
-      ctx.fillStyle = overlayColor
-      ctx.fillRect(0, 0, width, height)
-      ctx.restore()
 
       const barWidth = width / BAR_COUNT
 

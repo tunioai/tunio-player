@@ -1,5 +1,4 @@
 import React from "react"
-import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import Player from "./Player"
 import "./demo.css"
@@ -14,10 +13,10 @@ const App: React.FC = () => {
         <Player id="a2f86e8e-5b10-434a-b8b7-e47b17535e6b" ambient opacity={0} />
       </div>
 
-      <div className="player-wrapper-light">
+      {/* <div className="player-wrapper-light">
         <h2>Player with Ambient Mode on light background</h2>
         <Player id="7841b380-5d15-426a-9988-143d06d5c550" theme="light" ambient />
-      </div>
+      </div> */}
 
       {/* <div className="player-wrapper-color">
         <h2>Player with Ambient Mode on light background</h2>
@@ -27,8 +26,4 @@ const App: React.FC = () => {
   )
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-)
+createRoot(document.getElementById("root")!).render(<App />)

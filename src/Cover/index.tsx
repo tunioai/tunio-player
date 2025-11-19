@@ -3,7 +3,7 @@ import type { StreamConfig, Track } from "../types"
 
 interface Props {
   track: Track | undefined
-  streamConfig: StreamConfig
+  streamConfig: StreamConfig | null
   onImageLoad: (image: HTMLImageElement, imageUrl: string, valid: boolean) => void
 }
 
@@ -21,9 +21,14 @@ export const Cover: React.FC<Props> = ({ track, streamConfig, onImageLoad }) => 
       return
     }
 
-    const imageUrl = `https://app.tunio.ai/api/d/image/stream-${streamConfig.stream_name}.webp`
+    const imageUrl = `https://app.tunio.ai/api/d/image/stream-${streamConfig?.stream_name}.webp`
     setCoverImage(imageUrl)
     onImageLoad(img, imageUrl, isValid)
+  }
+
+  // TODO: add placeholder
+  if (!streamConfig) {
+    return <div className="tunio-cover" />
   }
 
   return (

@@ -74,13 +74,10 @@ const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "da
     setBgColor(getDominantColor(image))
   }, [])
 
-  const fetchStreamConfig = useCallback(
-    async (abort: AbortController) => {
-      const data = await fetchPlayerConfig(id, abort)
-      setStreamConfig(data)
-    },
-    [id]
-  )
+  const fetchStreamConfig = useCallback(async () => {
+    const data = await fetchPlayerConfig(id)
+    setStreamConfig(data)
+  }, [id])
 
   const fetchCurrentTrack = useCallback(() => {
     if (abortControllerRef.current) {
@@ -129,8 +126,12 @@ const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "da
     }
 
     fetchCurrentTrack()
-    fetchStreamConfig(abortControllerRef.current)
   }, [id, checkOverflow])
+
+  useEffect(() => {
+    if (!id) return
+    fetchStreamConfig()
+  }, [id])
 
   const handleVolumeChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -323,53 +324,55 @@ const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "da
     [isOverflowing, textScrollDistance]
   )
 
-  if (!streamConfig) return null
-
   return (
     <div
       ref={playerRef}
       className={clsx("tunio-player", { "tunio-theme-dark": theme === "dark", "tunio-theme-light": theme === "light" })}
     >
       <div className={`tunio-player-body ${visualizerOnly && "tunio-player-body--hidden"}`}>
-        {ambient && coverURL && <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />}
+        {ambient && coverURL && !isVisualizerOpen && (
+          <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />
+        )}
         <div className="tunio-player-wrapper" style={backgroundStyle}>
           <Cover track={currentTrack} streamConfig={streamConfig} onImageLoad={onCoverImageLoad} />
-          <div className="tunio-container">
-            <div ref={titleContainerRef}>
-              <div
-                ref={titleRef}
-                className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}
-                style={scrollStyle}
-              >
-                {currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "}
+          {!isVisualizerOpen && (
+            <div className="tunio-container">
+              <div ref={titleContainerRef}>
+                <div
+                  ref={titleRef}
+                  className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}
+                  style={scrollStyle}
+                >
+                  {currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "}
+                </div>
               </div>
-            </div>
-            <div className="tunio-actions">
-              <PlayPauseButton
-                action={isPlaying ? "stop" : "play"}
-                onStop={handlePlayToggle}
-                onPlay={handlePlayToggle}
-                loading={buffering}
-              />
-              <MuteButton onClick={toggleMute} muted={isMuted} />
-              <VisualizerButton onClick={handleVisualizerOpen} />
-              <div className="tunio-native-range-wrapper">
-                <div className="tunio-native-range-container">
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={volume}
-                    onChange={handleVolumeChange}
-                    className="tunio-native-range"
-                    style={{ backgroundSize: volumeBarBackgroundSize }}
-                  />
+              <div className="tunio-actions">
+                <PlayPauseButton
+                  action={isPlaying ? "stop" : "play"}
+                  onStop={handlePlayToggle}
+                  onPlay={handlePlayToggle}
+                  loading={buffering}
+                />
+                <MuteButton onClick={toggleMute} muted={isMuted} />
+                <VisualizerButton onClick={handleVisualizerOpen} />
+                <div className="tunio-native-range-wrapper">
+                  <div className="tunio-native-range-container">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={volume}
+                      onChange={handleVolumeChange}
+                      className="tunio-native-range"
+                      style={{ backgroundSize: volumeBarBackgroundSize }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          {streamConfig.wetermark && (
+          )}
+          {streamConfig?.wetermark && (
             <div className="tunio-player-watermark">
               <WaterMark height={14} color={theme === "dark" ? "#fff" : "#000"} />
             </div>
