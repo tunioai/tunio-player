@@ -4,4 +4,5 @@ export interface Props {
   theme?: "dark" | "light"
   opacity?: number
   visualizerOnly?: boolean
+  liquid?: boolean
 }

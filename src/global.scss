@@ -105,7 +105,7 @@
         text-align: left !important;
 
         .tunio-title {
-          display: inline-block;
+          display: block;
           height: 24px;
           font-size: 13px;
           text-wrap: nowrap;
@@ -114,13 +114,25 @@
           position: relative;
           user-select: none;
           max-width: 100%;
+        }
 
-          &.tunio-scrolling {
-            display: inline-block;
-            white-space: nowrap;
-            padding-right: 20px;
-            animation: tunio-scrollText 8s linear infinite;
-          }
+        .tunio-title-track {
+          --marquee-gap: 40px;
+          display: inline-flex;
+          width: max-content;
+          align-items: center;
+          gap: var(--marquee-gap);
+        }
+
+        .tunio-title-text {
+          display: inline-block;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        .tunio-title.tunio-scrolling .tunio-title-track {
+          animation: marquee 10s linear infinite;
+          will-change: transform;
         }
 
         .tunio-actions {
@@ -186,7 +198,7 @@
   height: 100%;
   background-position: center;
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size: 105%;
   border-radius: calc(var(--player-widget-border-radius) - 5px);
   position: relative;
   z-index: 2;
@@ -575,26 +587,12 @@
   }
 }
 
-@keyframes tunio-scrollText {
-  0%,
-  2% {
+@keyframes marquee {
+  0% {
     transform: translateX(0);
   }
-  20%,
-  32% {
-    transform: translateX(var(--scroll-distance));
-  }
-  50%,
-  52% {
-    transform: translateX(0);
-  }
-  70%,
-  82% {
-    transform: translateX(var(--scroll-distance));
-  }
-  98%,
   100% {
-    transform: translateX(0);
+    transform: translateX(calc(-50% - var(--marquee-gap) / 2));
   }
 }
 

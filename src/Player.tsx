@@ -19,10 +19,17 @@ const generateUniqueId = () => `player_${Math.random().toString(36).substr(2, 9)
 const calculateBackgroundSize = (value: number, min: number, max: number) =>
   ((value - min) / (max - min)) * 100 + "% 100%"
 
-const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "dark", visualizerOnly = false }) => {
+const Player: React.FC<Props> = ({
+  id,
+  opacity = 1,
+  ambient = false,
+  theme = "dark",
+  visualizerOnly = false,
+  liquid = false
+}) => {
   const playerIdRef = useRef<string>(generateUniqueId())
   const playerRef = useRef<HTMLDivElement>(null)
-  const titleRef = useRef<HTMLDivElement>(null)
+  const titleRef = useRef<HTMLSpanElement>(null)
   const titleContainerRef = useRef<HTMLDivElement>(null)
   const currentTrackUpdateInterval = useRef<NodeJS.Timeout | null>(null)
   const initialLoadingRef = useRef<boolean>(true)
@@ -37,7 +44,6 @@ const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "da
   const [streamConfig, setStreamConfig] = useState<StreamConfig | null>(null)
   const [coverURL, setCoverURL] = useState<string | null>(null)
   const [isOverflowing, setIsOverflowing] = useState(false)
-  const [textScrollDistance, setTextScrollDistance] = useState(0)
   const [streamsData, setStreamsData] = useState<Array<string>>([])
   const [isVisualizerOpen, setIsVisualizerOpen] = useState(visualizerOnly)
   const fullscreenOwnerRef = useRef(false)
@@ -53,11 +59,6 @@ const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "da
       const textWidth = titleRef.current.scrollWidth
       const containerWidth = titleContainerRef.current.clientWidth
       const isTextOverflowing = textWidth > containerWidth
-
-      if (isTextOverflowing) {
-        const distance = textWidth - containerWidth
-        setTextScrollDistance(distance)
-      }
 
       setIsOverflowing(isTextOverflowing)
     }
@@ -279,7 +280,6 @@ const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "da
     setCoverURL(null)
     setBgColor(null)
     setIsOverflowing(false)
-    setTextScrollDistance(0)
     setCurrentTrack(undefined)
     streamsDataRef.current = []
     setStreamsData([])
@@ -314,15 +314,7 @@ const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "da
     }
   }, [opacity])
 
-  const scrollStyle = useMemo(
-    () =>
-      isOverflowing
-        ? ({
-            "--scroll-distance": `-${textScrollDistance}px`
-          } as React.CSSProperties)
-        : {},
-    [isOverflowing, textScrollDistance]
-  )
+  const titleText = currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "
 
   return (
     <div
@@ -333,17 +325,28 @@ const Player: React.FC<Props> = ({ id, opacity = 1, ambient = false, theme = "da
         {ambient && coverURL && !isVisualizerOpen && (
           <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />
         )}
-        <div className="tunio-player-wrapper" style={backgroundStyle}>
+        <div
+          className="tunio-player-wrapper"
+          style={{
+            ...backgroundStyle,
+            ...(liquid ? { backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" } : {})
+          }}
+        >
           <Cover track={currentTrack} streamConfig={streamConfig} onImageLoad={onCoverImageLoad} />
           {!isVisualizerOpen && (
             <div className="tunio-container">
               <div ref={titleContainerRef}>
-                <div
-                  ref={titleRef}
-                  className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}
-                  style={scrollStyle}
-                >
-                  {currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "}
+                <div className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}>
+                  <div className="tunio-title-track">
+                    <span ref={titleRef} className="tunio-title-text">
+                      {titleText}
+                    </span>
+                    {isOverflowing && (
+                      <span className="tunio-title-text" aria-hidden="true">
+                        {titleText}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="tunio-actions">
