@@ -22,6 +22,7 @@ type HostVisualizerPayload = {
   artist?: string
   title?: string
   station?: string
+  isFailoverMode?: boolean
 }
 
 const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
@@ -36,6 +37,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
 }) => {
   const backdropRef = useRef<HTMLDivElement | null>(null)
   const [hostPayload, setHostPayload] = useState<HostVisualizerPayload | null>(null)
+  const [isFailoverMode, setIsFailoverMode] = useState(false)
 
   const isEmbedded = useMemo(() => {
     if (typeof window === "undefined") return false
@@ -87,6 +89,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
       if (data.type !== "tunio-visualizer-update" || typeof data.payload !== "object") return
       const payload = data.payload as HostVisualizerPayload
       setHostPayload(payload)
+      setIsFailoverMode(Boolean(payload.isFailoverMode))
     }
 
     window.addEventListener("message", handler)
@@ -108,8 +111,13 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
   if (!isOpen) return null
 
   const stationLabel = hostPayload?.station?.trim() || stream?.title || streamConfig?.stream_name || "Tunio Radio"
-  const title = hostPayload?.title?.trim() || track?.title || "Live stream"
-  const artist = hostPayload?.artist?.trim() || track?.artist || "Tunio"
+  const shouldUseHostMetadata = isFailoverMode && Boolean(hostPayload)
+  const title = shouldUseHostMetadata && hostPayload?.title?.trim()
+    ? hostPayload.title.trim()
+    : track?.title || "Live stream"
+  const artist = shouldUseHostMetadata && hostPayload?.artist?.trim()
+    ? hostPayload.artist.trim()
+    : track?.artist || "Tunio"
   const titleKey = `${stationLabel}-${title}`
   const normalizedStationLength = stationLabel.replace(/\s+/g, "").length
   const stationClassName =
