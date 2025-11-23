@@ -443,7 +443,7 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
         ref={canvasRef}
         className="tunio-visualizer-canvas"
         aria-hidden="true"
-        style={{ ...(liveBackground && { opacity: 0.7 }) }}
+        style={{ ...(liveBackground && { opacity: 0.6 }) }}
       />
     </>
   )

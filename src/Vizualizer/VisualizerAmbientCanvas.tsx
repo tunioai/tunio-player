@@ -20,7 +20,7 @@ const VisualizerAmbientCanvas: React.FC<VisualizerAmbientCanvasProps> = ({
   trackBackground,
   liveBackground
 }) => {
-  if (liveBackground) return <VisualizerVideoBackground streamConfig={streamConfig} opacity={0.6} />
+  if (liveBackground) return <VisualizerVideoBackground streamConfig={streamConfig} opacity={0.5} />
 
   return (
     <div

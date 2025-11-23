@@ -27,18 +27,13 @@ const waitForCanPlay = (video: HTMLVideoElement) => {
   })
 }
 
-const pickNextIndex = (length: number, excludeIndex: number | null) => {
-  if (length === 0) return null
-  if (length === 1) return 0
-
-  let next = Math.floor(Math.random() * length)
-  if (excludeIndex != null) {
-    while (next === excludeIndex) {
-      next = Math.floor(Math.random() * length)
-    }
+const createShuffledQueue = (length: number) => {
+  const indices = Array.from({ length }, (_, index) => index)
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[indices[i], indices[j]] = [indices[j], indices[i]]
   }
-
-  return next
+  return indices
 }
 
 const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ streamConfig, opacity = 0 }) => {
@@ -47,22 +42,23 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
   const [activeBuffer, setActiveBuffer] = useState<0 | 1>(0)
   const switchingRef = useRef(false)
   const fadeTimeoutRef = useRef<number | null>(null)
+  const playQueueRef = useRef<number[]>([])
 
   const playlist = useMemo(() => streamConfig.live_backgrounds.filter(Boolean), [streamConfig.live_backgrounds])
-  const [currentIndex, setCurrentIndex] = useState<number | null>(
-    playlist.length ? pickNextIndex(playlist.length, null) : null
-  )
+  const [currentIndex, setCurrentIndex] = useState<number | null>(null)
 
   // Reset playlist index when list changes
   useEffect(() => {
     if (!playlist.length) {
+      playQueueRef.current = []
       setCurrentIndex(null)
       return
     }
-    setCurrentIndex(prev => {
-      if (prev != null && prev < playlist.length) return prev
-      return pickNextIndex(playlist.length, null)
-    })
+
+    const nextQueue = createShuffledQueue(playlist.length)
+    const initialIndex = nextQueue.shift() ?? null
+    playQueueRef.current = nextQueue
+    setCurrentIndex(initialIndex)
   }, [playlist])
 
   const primeBuffer = useCallback(
@@ -85,7 +81,7 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
         video.load()
       }
     },
-    [DEFAULT_BASE_URL, playlist]
+    [playlist]
   )
 
   const playBuffer = useCallback((bufferIndex: 0 | 1) => {
@@ -166,6 +162,23 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
     }
   }, [localVideoRef])
 
+  const getNextIndexFromQueue = useCallback(() => {
+    if (!playlist.length) return null
+
+    if (playQueueRef.current.length === 0) {
+      const refilledQueue = createShuffledQueue(playlist.length)
+      if (currentIndex != null && refilledQueue.length > 1 && refilledQueue[0] === currentIndex) {
+        const swapIndex = refilledQueue.findIndex(index => index !== currentIndex)
+        if (swapIndex > 0) {
+          ;[refilledQueue[0], refilledQueue[swapIndex]] = [refilledQueue[swapIndex], refilledQueue[0]]
+        }
+      }
+      playQueueRef.current = refilledQueue
+    }
+
+    return playQueueRef.current.shift() ?? null
+  }, [currentIndex, playlist.length])
+
   const handleCycle = useCallback(() => {
     if (playlist.length <= 1) {
       const ref = bufferRefs.current[activeBuffer]
@@ -176,9 +189,10 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
       }
       return
     }
-    const nextIndex = pickNextIndex(playlist.length, currentIndex)
+    const nextIndex = getNextIndexFromQueue()
+    if (nextIndex == null) return
     void transitionToIndex(nextIndex)
-  }, [activeBuffer, currentIndex, playBuffer, playlist.length, transitionToIndex])
+  }, [activeBuffer, getNextIndexFromQueue, playBuffer, playlist.length, transitionToIndex])
 
   const handleVideoEvent = useCallback(
     (event: React.SyntheticEvent<HTMLVideoElement>) => {
