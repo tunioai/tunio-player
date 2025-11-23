@@ -55,7 +55,6 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
 
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null)
   const resizeRafRef = useRef<number | null>(null)
-  const pulseFrameRef = useRef(0)
 
   // Background image state
   const bgImageRef = useRef<HTMLImageElement | null>(null)
@@ -314,24 +313,6 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
         const capH = Math.max(CAP_MIN, Math.min(CAP_MAX, barWidth * 0.25))
         ctx.fillStyle = "rgba(255,255,255,0.95)"
         ctx.fillRect(x + barWidth * 0.28, Math.max(0, currentPeakY - capH), barWidth * 0.44, capH)
-      }
-
-      // Bass pulse ring — render less frequently to reduce blend cost
-      const dataArrayIndex = Math.min(5, binCount - 1)
-      const bassValue = dataArray[dataArrayIndex] / 255
-      const pulseRadius = 180 + bassValue * 140
-      const hue = 210 + bassValue * 25
-
-      pulseFrameRef.current += 1
-      if (pulseFrameRef.current % 3 === 0) {
-        ctx.save()
-        ctx.globalCompositeOperation = "screen"
-        ctx.beginPath()
-        ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.8)`
-        ctx.lineWidth = 2
-        ctx.arc(width / 2, height / 2, pulseRadius, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.restore()
       }
     }
 
