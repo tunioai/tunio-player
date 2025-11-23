@@ -649,3 +649,33 @@
     transform: scale(1);
   }
 }
+.tunio-visualizer-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.tunio-visualizer-video-layer {
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  will-change: opacity;
+}
+
+.tunio-visualizer-video-layer--visible {
+  opacity: 1;
+}
+
+.tunio-visualizer-video-wrapper {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.tunio-visualizer-video-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}

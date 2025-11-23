@@ -10,6 +10,7 @@ export interface Track {
 export interface StreamConfig {
   wetermark: boolean
   stream_name: string
+  live_backgrounds: Array<string>
 }
 
 export interface TrackBackground {

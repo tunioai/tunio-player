@@ -10,7 +10,7 @@ const App: React.FC = () => {
       <h1>Tunio Player Demo</h1>
       <div className="player-wrapper-dark">
         <h2>Player with Ambient Mode</h2>
-        <Player id="a2f86e8e-5b10-434a-b8b7-e47b17535e6b" ambient opacity={0} liquid />
+        <Player id="a2f86e8e-5b10-434a-b8b7-e47b17535e6b" ambient opacity={0} />
       </div>
 
       {/* <div className="player-wrapper-light">

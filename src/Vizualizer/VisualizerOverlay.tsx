@@ -45,6 +45,12 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
     return params.get("embedded") === "1"
   }, [])
 
+  const isLiveBackground = useMemo(() => {
+    if (typeof window === "undefined") return false
+    const params = new URLSearchParams(window.location.search)
+    return params.get("live") === "1"
+  }, [])
+
   const exitFullscreen = useCallback((event?: Event | React.SyntheticEvent) => {
     event?.preventDefault()
     event?.stopPropagation()
@@ -112,12 +118,10 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
 
   const stationLabel = hostPayload?.station?.trim() || stream?.title || streamConfig?.stream_name || "Tunio Radio"
   const shouldUseHostMetadata = isFailoverMode && Boolean(hostPayload)
-  const title = shouldUseHostMetadata && hostPayload?.title?.trim()
-    ? hostPayload.title.trim()
-    : track?.title || "Live stream"
-  const artist = shouldUseHostMetadata && hostPayload?.artist?.trim()
-    ? hostPayload.artist.trim()
-    : track?.artist || "Tunio"
+  const title =
+    shouldUseHostMetadata && hostPayload?.title?.trim() ? hostPayload.title.trim() : track?.title || "Live stream"
+  const artist =
+    shouldUseHostMetadata && hostPayload?.artist?.trim() ? hostPayload.artist.trim() : track?.artist || "Tunio"
   const titleKey = `${stationLabel}-${title}`
   const normalizedStationLength = stationLabel.replace(/\s+/g, "").length
   const stationClassName =
@@ -126,6 +130,8 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
       : normalizedStationLength <= 22
       ? "tunio-visualizer-station tunio-visualizer-station-lg"
       : "tunio-visualizer-station"
+
+  if (!streamConfig) return null
 
   return (
     <div className="tunio-visualizer-overlay" role="dialog" aria-modal={true} onClick={onCloseHandler}>
@@ -136,7 +142,9 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
             trackBackground={trackBackground}
             audioRef={audioRef}
             backdropRef={backdropRef}
+            streamConfig={streamConfig}
             backdropUrl={getBackdropUrl()}
+            liveBackground={isLiveBackground}
           />
         </>
       ) : (
@@ -144,6 +152,8 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
           backdropRef={backdropRef}
           trackBackground={trackBackground}
           backdropUrl={getBackdropUrl()}
+          streamConfig={streamConfig}
+          liveBackground={isLiveBackground}
         />
       )}
 

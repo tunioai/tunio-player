@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef } from "react"
-import type { TrackBackground } from "../types"
+import VisualizerVideoBackground from "./modules/VisualizerVideoBackground"
+import type { TrackBackground, StreamConfig } from "../types"
 
 type AudioGraph = {
   context: AudioContext
@@ -23,7 +24,9 @@ type VisualizerAudioCanvasProps = {
   audioRef: React.MutableRefObject<HTMLAudioElement | null>
   backdropRef: React.RefObject<HTMLDivElement | null>
   backdropUrl: string
+  streamConfig: StreamConfig
   trackBackground: TrackBackground | null
+  liveBackground?: boolean
 }
 
 const BAR_COUNT = 50
@@ -38,11 +41,13 @@ const CAP_MAX = 4
 const MAX_DPR = 1.5 // clamp DPR to avoid huge canvases on Retina
 
 const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
+  streamConfig,
   isOpen,
   audioRef,
   backdropRef,
   backdropUrl,
-  trackBackground
+  trackBackground,
+  liveBackground = false
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationFrameRef = useRef<number | null>(null)
@@ -184,46 +189,49 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
       // 1) Clear canvas fully each frame
       ctx.clearRect(0, 0, width, height)
 
-      // 2) Draw blurred background image (cover)
-      const bgImg = bgImageRef.current
-      if (bgImg && bgReadyRef.current) {
-        ctx.save()
+      if (!liveBackground) {
+        // 2) Draw blurred background image (cover)
+        const bgImg = bgImageRef.current
+        if (bgImg && bgReadyRef.current) {
+          ctx.save()
 
-        const imgRatio = bgImg.width / bgImg.height
-        const canvasRatio = width / height
+          const imgRatio = bgImg.width / bgImg.height
+          const canvasRatio = width / height
 
-        let drawWidth: number
-        let drawHeight: number
-        let drawX: number
-        let drawY: number
+          let drawWidth: number
+          let drawHeight: number
+          let drawX: number
+          let drawY: number
 
-        // cover logic
-        if (imgRatio > canvasRatio) {
-          // image is wider than canvas
-          drawHeight = height
-          drawWidth = height * imgRatio
-          drawX = (width - drawWidth) / 2
-          drawY = 0
-        } else {
-          // image is taller than canvas
-          drawWidth = width
-          drawHeight = width / imgRatio
-          drawX = 0
-          drawY = (height - drawHeight) / 2
+          // cover logic
+          if (imgRatio > canvasRatio) {
+            // image is wider than canvas
+            drawHeight = height
+            drawWidth = height * imgRatio
+            drawX = (width - drawWidth) / 2
+            drawY = 0
+          } else {
+            // image is taller than canvas
+            drawWidth = width
+            drawHeight = width / imgRatio
+            drawX = 0
+            drawY = (height - drawHeight) / 2
+          }
+
+          const blurRadius = 10
+          ctx.filter = `blur(${blurRadius}px)`
+          ctx.drawImage(bgImg, drawX, drawY, drawWidth, drawHeight)
+          ctx.filter = "none"
+
+          ctx.save()
+          ctx.globalCompositeOperation = "multiply"
+          ctx.fillStyle = "rgba(0, 0, 0, 0.5)" // ← adjust darkness here
+          ctx.fillRect(0, 0, width, height)
+          ctx.restore()
+
+          // Soft vignette on top of blurred background
         }
 
-        const blurRadius = 10
-        ctx.filter = `blur(${blurRadius}px)`
-        ctx.drawImage(bgImg, drawX, drawY, drawWidth, drawHeight)
-        ctx.filter = "none"
-
-        ctx.save()
-        ctx.globalCompositeOperation = "multiply"
-        ctx.fillStyle = "rgba(0, 0, 0, 0.5)" // ← adjust darkness here
-        ctx.fillRect(0, 0, width, height)
-        ctx.restore()
-
-        // Soft vignette on top of blurred background
         ctx.save()
 
         ctx.globalCompositeOperation = "multiply"
@@ -430,7 +438,13 @@ const VisualizerAudioCanvas: React.FC<VisualizerAudioCanvasProps> = ({
   return (
     <>
       <div className="tunio-visualizer-backdrop tunio-visualizer-backdrop--audio"></div>
-      <canvas ref={canvasRef} className="tunio-visualizer-canvas" aria-hidden="true" />
+      {liveBackground && <VisualizerVideoBackground streamConfig={streamConfig} />}
+      <canvas
+        ref={canvasRef}
+        className="tunio-visualizer-canvas"
+        aria-hidden="true"
+        style={{ ...(liveBackground && { opacity: 0.7 }) }}
+      />
     </>
   )
 }
