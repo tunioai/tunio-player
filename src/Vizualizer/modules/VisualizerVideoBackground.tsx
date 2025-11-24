@@ -10,9 +10,6 @@ export type VisualizerVideoBackgroundProps = {
   opacity?: number
 }
 
-const BUFFER_COUNT = 2 as const
-const FADE_DURATION_MS = 600
-
 const waitForCanPlay = (video: HTMLVideoElement) => {
   if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
     return Promise.resolve()
@@ -37,11 +34,8 @@ const createShuffledQueue = (length: number) => {
 }
 
 const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ streamConfig, opacity = 0 }) => {
-  const localVideoRef = useRef<HTMLVideoElement>(null)
-  const bufferRefs = useRef(Array.from({ length: BUFFER_COUNT }, () => React.createRef<HTMLVideoElement>()))
-  const [activeBuffer, setActiveBuffer] = useState<0 | 1>(0)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const switchingRef = useRef(false)
-  const fadeTimeoutRef = useRef<number | null>(null)
   const playQueueRef = useRef<number[]>([])
 
   const playlist = useMemo(() => streamConfig.live_backgrounds.filter(Boolean), [streamConfig.live_backgrounds])
@@ -52,115 +46,72 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
     if (!playlist.length) {
       playQueueRef.current = []
       setCurrentIndex(null)
+      switchingRef.current = false
+      const video = videoRef.current
+      if (video) {
+        video.pause()
+        video.removeAttribute("src")
+        video.load()
+      }
       return
     }
 
     const nextQueue = createShuffledQueue(playlist.length)
     const initialIndex = nextQueue.shift() ?? null
     playQueueRef.current = nextQueue
+    if (initialIndex != null) {
+      switchingRef.current = true
+    }
     setCurrentIndex(initialIndex)
   }, [playlist])
 
-  const primeBuffer = useCallback(
-    async (bufferIndex: 0 | 1, index: number | null) => {
-      const ref = bufferRefs.current[bufferIndex]
-      const video = ref?.current
-      if (!video || index == null || !playlist[index]) return
+  const loadAndPlay = useCallback(
+    async (index: number) => {
+      const video = videoRef.current
+      if (!video || !playlist[index]) return
 
       const source = `${DEFAULT_BASE_URL}/${playlist[index]}.mp4`
       if (video.src !== source) {
         video.src = source
         video.load()
+      } else {
+        video.pause()
       }
 
       await waitForCanPlay(video)
-      video.pause()
       try {
         video.currentTime = 0
       } catch {
         video.load()
       }
+
+      const playPromise = video.play()
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          // ignore autoplay restrictions
+        })
+      }
     },
     [playlist]
   )
 
-  const playBuffer = useCallback((bufferIndex: 0 | 1) => {
-    const ref = bufferRefs.current[bufferIndex]
-    const video = ref?.current
-    if (!video) return
-
-    const playPromise = video.play()
-    if (playPromise && typeof playPromise.catch === "function") {
-      playPromise.catch(() => {
-        // ignore autoplay restrictions silently
-      })
-    }
-  }, [])
-
-  const stopBuffer = useCallback((bufferIndex: 0 | 1) => {
-    const ref = bufferRefs.current[bufferIndex]
-    const video = ref?.current
-    if (!video) return
-    video.pause()
-  }, [])
-
-  const transitionToIndex = useCallback(
-    async (nextIndex: number | null) => {
-      if (nextIndex == null || switchingRef.current) return
-      const incomingBuffer = activeBuffer === 0 ? 1 : 0
-      switchingRef.current = true
-
-      await primeBuffer(incomingBuffer, nextIndex)
-
-      setActiveBuffer(incomingBuffer)
-      setCurrentIndex(nextIndex)
-
-      const startPlayback = () => {
-        playBuffer(incomingBuffer)
-      }
-
-      if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-        window.requestAnimationFrame(startPlayback)
-      } else {
-        startPlayback()
-      }
-
-      if (fadeTimeoutRef.current) {
-        window.clearTimeout(fadeTimeoutRef.current)
-      }
-
-      fadeTimeoutRef.current = window.setTimeout(() => {
-        stopBuffer(activeBuffer)
-        switchingRef.current = false
-      }, FADE_DURATION_MS)
-    },
-    [activeBuffer, playBuffer, primeBuffer, stopBuffer]
-  )
-
   useEffect(() => {
     if (currentIndex == null) return
-    void primeBuffer(activeBuffer, currentIndex).then(() => {
-      playBuffer(activeBuffer)
-    })
-  }, [activeBuffer, currentIndex, playBuffer, primeBuffer])
 
-  useEffect(() => {
-    return () => {
-      if (fadeTimeoutRef.current) {
-        window.clearTimeout(fadeTimeoutRef.current)
+    let canceled = false
+    const startPlayback = async () => {
+      await loadAndPlay(currentIndex)
+      if (!canceled) {
+        switchingRef.current = false
       }
     }
-  }, [])
 
-  useEffect(() => {
-    localVideoRef.current = bufferRefs.current[activeBuffer]?.current ?? null
-  }, [activeBuffer, localVideoRef])
+    void startPlayback()
 
-  useEffect(() => {
     return () => {
-      localVideoRef.current = null
+      canceled = true
     }
-  }, [localVideoRef])
+  }, [currentIndex, loadAndPlay])
 
   const getNextIndexFromQueue = useCallback(() => {
     if (!playlist.length) return null
@@ -179,29 +130,36 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
     return playQueueRef.current.shift() ?? null
   }, [currentIndex, playlist.length])
 
+  const transitionToIndex = useCallback(
+    (nextIndex: number | null) => {
+      if (nextIndex == null || switchingRef.current) return
+      switchingRef.current = true
+      setCurrentIndex(nextIndex)
+    },
+    []
+  )
+
   const handleCycle = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+
     if (playlist.length <= 1) {
-      const ref = bufferRefs.current[activeBuffer]
-      const video = ref?.current
-      if (video) {
-        video.currentTime = 0
-        playBuffer(activeBuffer)
+      video.currentTime = 0
+      const playPromise = video.play()
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {})
       }
       return
     }
+
     const nextIndex = getNextIndexFromQueue()
     if (nextIndex == null) return
-    void transitionToIndex(nextIndex)
-  }, [activeBuffer, getNextIndexFromQueue, playBuffer, playlist.length, transitionToIndex])
+    transitionToIndex(nextIndex)
+  }, [getNextIndexFromQueue, playlist.length, transitionToIndex])
 
-  const handleVideoEvent = useCallback(
-    (event: React.SyntheticEvent<HTMLVideoElement>) => {
-      const bufferIndex = Number(event.currentTarget.dataset.bufferIndex) as 0 | 1
-      if (bufferIndex !== activeBuffer) return
-      handleCycle()
-    },
-    [activeBuffer, handleCycle]
-  )
+  const handleVideoEvent = useCallback(() => {
+    handleCycle()
+  }, [handleCycle])
 
   if (!playlist.length) {
     return null
@@ -209,26 +167,18 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
 
   return (
     <div className="tunio-visualizer-video-wrapper" aria-hidden="true">
-      {[...Array(BUFFER_COUNT).keys()].map(index => (
-        <video
-          key={index}
-          ref={element => {
-            bufferRefs.current[index].current = element
-          }}
-          data-buffer-index={index}
-          className={`tunio-visualizer-video tunio-visualizer-video-layer ${
-            activeBuffer === index ? "tunio-visualizer-video-layer--visible" : ""
-          }`}
-          playsInline={true}
-          muted={true}
-          preload="auto"
-          autoPlay={false}
-          loop={false}
-          tabIndex={-1}
-          onEnded={handleVideoEvent}
-          onError={handleVideoEvent}
-        />
-      ))}
+      <video
+        ref={videoRef}
+        className="tunio-visualizer-video"
+        playsInline={true}
+        muted={true}
+        preload="auto"
+        autoPlay={false}
+        loop={false}
+        tabIndex={-1}
+        onEnded={handleVideoEvent}
+        onError={handleVideoEvent}
+      />
       {opacity > 0 && (
         <div className="tunio-visualizer-video-overlay" style={{ backgroundColor: `rgba(0, 0, 0, ${opacity})` }} />
       )}
