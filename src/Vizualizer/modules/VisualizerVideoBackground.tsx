@@ -12,6 +12,8 @@ export type VisualizerVideoBackgroundProps = {
 
 const BUFFER_COUNT = 2 as const
 const FADE_DURATION_MS = 600
+const CROSSFADE_LEAD_MS = 900
+const PLAYBACK_GUARD_INTERVAL_MS = 2000
 
 const waitForCanPlay = (video: HTMLVideoElement) => {
   if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -42,12 +44,14 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
   const [activeBuffer, setActiveBuffer] = useState<0 | 1>(0)
   const switchingRef = useRef(false)
   const fadeTimeoutRef = useRef<number | null>(null)
+  const playbackGuardIntervalRef = useRef<number | null>(null)
   const playQueueRef = useRef<number[]>([])
+  const playbackNudgeTimeoutsRef = useRef<number[]>([])
+  const lastEnforceRef = useRef(0)
 
   const playlist = useMemo(() => streamConfig.live_backgrounds.filter(Boolean), [streamConfig.live_backgrounds])
   const [currentIndex, setCurrentIndex] = useState<number | null>(null)
 
-  // Reset playlist index when list changes
   useEffect(() => {
     if (!playlist.length) {
       playQueueRef.current = []
@@ -78,22 +82,27 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
       try {
         video.currentTime = 0
       } catch {
-        video.load()
+        // ignore
       }
     },
     [playlist]
   )
 
-  const playBuffer = useCallback((bufferIndex: 0 | 1) => {
+  const playBuffer = useCallback(async (bufferIndex: 0 | 1) => {
     const ref = bufferRefs.current[bufferIndex]
     const video = ref?.current
-    if (!video) return
+    if (!video || video.ended) return
 
-    const playPromise = video.play()
-    if (playPromise && typeof playPromise.catch === "function") {
-      playPromise.catch(() => {
-        // ignore autoplay restrictions silently
-      })
+    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      await waitForCanPlay(video)
+    }
+
+    if (!video.paused) return
+
+    try {
+      await video.play()
+    } catch (err) {
+      console.warn("Play failed:", err)
     }
   }, [])
 
@@ -104,37 +113,72 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
     video.pause()
   }, [])
 
+  const resumeBufferPlayback = useCallback(
+    (bufferIndex: 0 | 1) => {
+      if (bufferIndex !== activeBuffer) return
+      const video = bufferRefs.current[bufferIndex]?.current
+      if (!video || video.ended || switchingRef.current) return
+      if (!video.paused) return
+      if (!video.muted) {
+        video.muted = true
+      }
+      playBuffer(bufferIndex)
+    },
+    [activeBuffer, playBuffer]
+  )
+
+  const clearPlaybackNudges = useCallback(() => {
+    if (typeof window === "undefined") return
+    playbackNudgeTimeoutsRef.current.forEach(timeoutId => window.clearTimeout(timeoutId))
+    playbackNudgeTimeoutsRef.current = []
+  }, [])
+
+  const enforceActivePlayback = useCallback(() => {
+    const now = Date.now()
+    if (now - lastEnforceRef.current < 1000) return
+    lastEnforceRef.current = now
+    resumeBufferPlayback(activeBuffer)
+  }, [activeBuffer, resumeBufferPlayback])
+
   const transitionToIndex = useCallback(
     async (nextIndex: number | null) => {
       if (nextIndex == null || switchingRef.current) return
       const incomingBuffer = activeBuffer === 0 ? 1 : 0
       switchingRef.current = true
 
+      clearPlaybackNudges()
+
       await primeBuffer(incomingBuffer, nextIndex)
 
       setActiveBuffer(incomingBuffer)
       setCurrentIndex(nextIndex)
 
-      const startPlayback = () => {
-        playBuffer(incomingBuffer)
-      }
-
-      if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-        window.requestAnimationFrame(startPlayback)
-      } else {
-        startPlayback()
-      }
-
-      if (fadeTimeoutRef.current) {
-        window.clearTimeout(fadeTimeoutRef.current)
-      }
-
+      // Release switching flag first, then start playback
       fadeTimeoutRef.current = window.setTimeout(() => {
         stopBuffer(activeBuffer)
         switchingRef.current = false
       }, FADE_DURATION_MS)
+
+      // Kick playback off shortly after the state change
+      if (typeof window !== "undefined") {
+        window.setTimeout(() => {
+          playBuffer(incomingBuffer)
+
+          // Sanity nudge to ensure Safari keeps playing
+          playbackNudgeTimeoutsRef.current = [
+            window.setTimeout(() => {
+              if (!switchingRef.current) {
+                const video = bufferRefs.current[incomingBuffer]?.current
+                if (video && video.paused && !video.ended) {
+                  playBuffer(incomingBuffer)
+                }
+              }
+            }, 700) // After the switching flag flips back to false
+          ]
+        }, 50)
+      }
     },
-    [activeBuffer, playBuffer, primeBuffer, stopBuffer]
+    [activeBuffer, clearPlaybackNudges, playBuffer, primeBuffer, stopBuffer]
   )
 
   useEffect(() => {
@@ -155,6 +199,43 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
   useEffect(() => {
     localVideoRef.current = bufferRefs.current[activeBuffer]?.current ?? null
   }, [activeBuffer, localVideoRef])
+
+  useEffect(() => {
+    enforceActivePlayback()
+  }, [activeBuffer, enforceActivePlayback])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        enforceActivePlayback()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [enforceActivePlayback])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const guardTick = () => {
+      enforceActivePlayback()
+    }
+    playbackGuardIntervalRef.current = window.setInterval(guardTick, PLAYBACK_GUARD_INTERVAL_MS)
+    return () => {
+      if (playbackGuardIntervalRef.current) {
+        window.clearInterval(playbackGuardIntervalRef.current)
+        playbackGuardIntervalRef.current = null
+      }
+    }
+  }, [enforceActivePlayback])
+
+  useEffect(() => {
+    return () => {
+      clearPlaybackNudges()
+    }
+  }, [clearPlaybackNudges])
 
   useEffect(() => {
     return () => {
@@ -194,13 +275,29 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
     void transitionToIndex(nextIndex)
   }, [activeBuffer, getNextIndexFromQueue, playBuffer, playlist.length, transitionToIndex])
 
-  const handleVideoEvent = useCallback(
+  const handlePlaybackComplete = useCallback(
     (event: React.SyntheticEvent<HTMLVideoElement>) => {
       const bufferIndex = Number(event.currentTarget.dataset.bufferIndex) as 0 | 1
       if (bufferIndex !== activeBuffer) return
       handleCycle()
     },
     [activeBuffer, handleCycle]
+  )
+
+  const handleTimeUpdate = useCallback(
+    (event: React.SyntheticEvent<HTMLVideoElement>) => {
+      if (playlist.length <= 1 || switchingRef.current) return
+      const bufferIndex = Number(event.currentTarget.dataset.bufferIndex) as 0 | 1
+      if (bufferIndex !== activeBuffer) return
+      const video = event.currentTarget
+      const duration = video.duration
+      if (!Number.isFinite(duration) || duration <= 0) return
+      const remainingMs = (duration - video.currentTime) * 1000
+      if (remainingMs <= CROSSFADE_LEAD_MS) {
+        handleCycle()
+      }
+    },
+    [activeBuffer, handleCycle, playlist.length]
   )
 
   if (!playlist.length) {
@@ -222,11 +319,12 @@ const VisualizerVideoBackground: React.FC<VisualizerVideoBackgroundProps> = ({ s
           playsInline={true}
           muted={true}
           preload="auto"
-          autoPlay={false}
+          autoPlay={true}
           loop={false}
           tabIndex={-1}
-          onEnded={handleVideoEvent}
-          onError={handleVideoEvent}
+          onEnded={handlePlaybackComplete}
+          onError={handlePlaybackComplete}
+          onTimeUpdate={handleTimeUpdate}
         />
       ))}
       {opacity > 0 && (

@@ -1,5 +1,6 @@
 "use client"
 
+import clsx from "clsx"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import WaterMark from "../WaterMark"
 // import QRCode from "./QRCode"
@@ -133,8 +134,10 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
 
   if (!streamConfig) return null
 
+  const overlayClassName = clsx("tunio-visualizer-overlay", isEmbedded && "tunio-visualizer-overlay--ambient")
+
   return (
-    <div className="tunio-visualizer-overlay" role="dialog" aria-modal={true} onClick={onCloseHandler}>
+    <div className={overlayClassName} role="dialog" aria-modal={true} onClick={onCloseHandler}>
       {!isEmbedded ? (
         <>
           <VisualizerAudioCanvas
@@ -153,27 +156,35 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
           trackBackground={trackBackground}
           backdropUrl={getBackdropUrl()}
           streamConfig={streamConfig}
+          streamDetails={stream}
+          isFailoverMode={isFailoverMode}
           liveBackground={isLiveBackground}
+          stationLabel={stationLabel}
+          trackTitle={title}
+          trackArtist={artist}
+          watermarkEnabled={Boolean(streamConfig.wetermark)}
         />
       )}
 
-      <div className="tunio-visualizer-info">
-        {streamConfig?.wetermark && (
-          <div className="tunio-visualizer-watermark">
-            <WaterMark height={30} color="#fff" />
+      {!isEmbedded && (
+        <div className="tunio-visualizer-info">
+          {streamConfig?.wetermark && (
+            <div className="tunio-visualizer-watermark">
+              <WaterMark height={30} color="#fff" />
+            </div>
+          )}
+          <div className={stationClassName} onClick={exitFullscreen}>
+            {stationLabel}
           </div>
-        )}
-        <div className={stationClassName} onClick={exitFullscreen}>
-          {stationLabel}
-        </div>
-        <div key={titleKey} className="tunio-visualizer-title tunio-visualizer-text-change">
-          {title}
-        </div>
+          <div key={titleKey} className="tunio-visualizer-title tunio-visualizer-text-change">
+            {title}
+          </div>
 
-        <div className="tunio-visualizer-artist tunio-visualizer-text-change" key={artist}>
-          {artist}
+          <div className="tunio-visualizer-artist tunio-visualizer-text-change" key={artist}>
+            {artist}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* <QRCode name={name} /> */}
     </div>

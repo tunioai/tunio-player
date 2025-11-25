@@ -347,7 +347,7 @@
   background-size: 105%;
   overflow: hidden;
   animation: none;
-  filter: blur(4px) saturate(1.03);
+  filter: saturate(1.08);
   z-index: 1;
   animation: tunio-bg-fade-in 0.3s ease-out forwards;
 }
@@ -369,6 +369,170 @@
     height: 100%;
     background-color: #000;
     opacity: 0.5;
+  }
+}
+
+.tunio-visualizer-ambient {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tunio-visualizer-ambient-blur,
+.tunio-visualizer-ambient-gradient {
+  position: absolute;
+  inset: -15%;
+  pointer-events: none;
+}
+
+.tunio-visualizer-ambient-blur {
+  z-index: 2;
+  background: radial-gradient(circle at 25% 25%, rgba(30, 22, 65, 0.65), transparent 55%),
+    radial-gradient(circle at 75% 60%, rgba(12, 31, 59, 0.65), transparent 50%);
+  filter: blur(60px);
+  opacity: 0.75;
+}
+
+.tunio-visualizer-ambient-gradient {
+  inset: 0;
+  z-index: 3;
+  background: radial-gradient(circle at 40% 20%, rgba(129, 140, 255, 0.6), transparent 55%),
+    radial-gradient(circle at 65% 70%, rgba(76, 210, 255, 0.35), transparent 60%),
+    linear-gradient(145deg, rgba(6, 7, 18, 0.6) 0%, rgba(4, 6, 18, 0.9) 55%);
+  mix-blend-mode: screen;
+  opacity: 0.4;
+}
+
+.tunio-visualizer-ambient-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(360px, 80vw, 860px);
+  height: clamp(360px, 80vh, 460px);
+  padding: clamp(24px, 6vw, 56px);
+  border-radius: 34px;
+  background: rgba(3, 6, 17, 0.4);
+  border: 1px solid #4e4870;
+  box-shadow: 0 0 20px rgba(37, 6, 147, 0.2);
+  backdrop-filter: blur(3px) saturate(1.2);
+  color: #fff;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: clamp(12px, 2vh, 20px);
+}
+
+.tunio-visualizer-ambient-card__brand {
+  margin-bottom: clamp(12px, 2vw, 18px);
+  opacity: 0.85;
+
+  svg {
+    height: clamp(22px, 3vw, 34px);
+    width: auto;
+  }
+}
+
+.tunio-visualizer-ambient-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(12px, 3vw, 28px);
+  font-size: clamp(12px, 2vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.tunio-visualizer-ambient-card__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35em 1.35em;
+  border-radius: 10px;
+  border: 1px solid rgba(139, 116, 255, 0.6);
+  color: #dee3ff;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  background: rgba(105, 90, 255, 0.2);
+}
+
+.tunio-visualizer-ambient-card__tagline {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+}
+
+.tunio-visualizer-ambient-card__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: clamp(10px, 2vh, 16px);
+}
+
+.tunio-visualizer-ambient-card__title {
+  margin: 0;
+  font-size: clamp(32px, 8vw, 78px);
+  line-height: 1.05;
+  font-weight: 800;
+}
+
+.tunio-visualizer-ambient-card__artist {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  font-size: clamp(18px, 4vw, 32px);
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 500;
+  text-align: center;
+}
+
+.tunio-visualizer-ambient-card__progress {
+  width: 100%;
+  height: 2vh;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  margin-top: auto;
+  border-radius: clamp(3px, 0.8vw, 6px);
+}
+
+.tunio-visualizer-ambient-card__progress-fill {
+  display: block;
+  width: 70%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #805dff 0%, #46dce5 100%);
+  box-shadow: 0 0 24px rgba(99, 84, 255, 0.75);
+  animation: tunio-ambient-progress 6s ease-in-out infinite alternate;
+}
+
+@keyframes tunio-ambient-progress {
+  0% {
+    transform: translateX(-10%);
+    width: 55%;
+  }
+  100% {
+    transform: translateX(10%);
+    width: 85%;
+  }
+}
+
+@media (max-width: 640px) {
+  .tunio-visualizer-ambient-card {
+    border-radius: 28px;
+    padding: 24px;
+    transform: translate(-50%, -50%) scale(0.95);
+    width: calc(100vw - 24px);
+    height: min(420px, calc(100vh - 64px));
+  }
+
+  .tunio-visualizer-ambient {
+    padding: 0 12px;
   }
 }
 
@@ -666,6 +830,10 @@
 
 .tunio-visualizer-video-layer--visible {
   opacity: 1;
+}
+
+.tunio-visualizer-video-layer--fading-out {
+  opacity: 0;
 }
 
 .tunio-visualizer-video-wrapper {

@@ -21,6 +21,9 @@ export interface TrackBackground {
 
 export interface Stream {
   title: string
+  current_time: Date
+  track_finishing_at: Date | null
+  track_started_at: Date | null
 }
 
 export interface CurrentResponse {
