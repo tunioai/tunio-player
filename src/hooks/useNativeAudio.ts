@@ -76,7 +76,7 @@ const useNativeAudio = (streams: Array<string> = []) => {
         return
       }
 
-      initAudio(currentStreamUrl.current)
+      initAudio(currentStreamUrl.current, true)
 
       if (shouldAutoReconnect.current) {
         const audio = audioRef.current
@@ -101,7 +101,7 @@ const useNativeAudio = (streams: Array<string> = []) => {
   }
   resetAutoReconnectRef.current = resetAutoReconnect
 
-  const initAudio = (streamUrl: string) => {
+  const initAudio = (streamUrl: string, loadImmediately = false) => {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.removeAttribute("src")
@@ -111,10 +111,9 @@ const useNativeAudio = (streams: Array<string> = []) => {
     }
 
     const audio = audioRef.current
-    audio.src = streamUrl
     audio.volume = state.volume
     audio.muted = state.isMuted
-    audio.preload = "auto"
+    audio.preload = "none"
     audio.crossOrigin = "anonymous"
 
     audio.onloadstart = () => {
@@ -175,6 +174,12 @@ const useNativeAudio = (streams: Array<string> = []) => {
     })
 
     currentStreamUrl.current = streamUrl
+
+    if (loadImmediately) {
+      audio.src = streamUrl
+    } else {
+      audio.removeAttribute("src")
+    }
   }
   initAudioRef.current = initAudio
 
@@ -199,7 +204,7 @@ const useNativeAudio = (streams: Array<string> = []) => {
       clearTimersRef.current()
       if (audioRef.current) {
         audioRef.current.pause()
-        audioRef.current.src = ""
+        audioRef.current.removeAttribute("src")
         audioRef.current.load()
       }
     }
@@ -212,37 +217,25 @@ const useNativeAudio = (streams: Array<string> = []) => {
       resetAutoReconnect()
       audioRef.current.pause()
     } else {
-      setState(prev => ({ ...prev, buffering: true }))
-      clearReconnectTimer()
-      shouldAutoReconnect.current = true
-      reconnectAttempts.current = 0
-
-      const playPromise = audioRef.current.play()
-
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            bufferingTimer.current = setTimeout(() => {
-              setState(prev => ({ ...prev, buffering: false }))
-            }, 500)
-          })
-          .catch(() => {
-            setState(prev => ({ ...prev, isPlaying: false, buffering: false }))
-            shouldAutoReconnect.current = false
-          })
-      }
+      play()
     }
   }
 
   const play = () => {
-    if (!audioRef.current || state.isPlaying) return
+    if (!audioRef.current || state.isPlaying || !currentStreamUrl.current) return
+
+    const audio = audioRef.current
+    if (audio.src !== currentStreamUrl.current) {
+      audio.src = currentStreamUrl.current
+    }
+
+    audio.load()
 
     setState(prev => ({ ...prev, buffering: true }))
     clearReconnectTimer()
-    shouldAutoReconnect.current = true
     reconnectAttempts.current = 0
 
-    const playPromise = audioRef.current.play()
+    const playPromise = audio.play()
 
     if (playPromise !== undefined) {
       playPromise
@@ -263,6 +256,8 @@ const useNativeAudio = (streams: Array<string> = []) => {
 
     resetAutoReconnect()
     audioRef.current.pause()
+    audioRef.current.removeAttribute("src")
+    audioRef.current.load()
     setState(prev => ({ ...prev, isPlaying: false, buffering: false, loading: false }))
   }
 

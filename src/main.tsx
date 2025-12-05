@@ -1,16 +1,36 @@
-import React from "react"
+import React, { useState } from "react"
 import { createRoot } from "react-dom/client"
 import Player from "./Player"
 import "./demo.css"
 import "./global.scss"
 
+const stations = [
+  { key: "main", id: "a2f86e8e-5b10-434a-b8b7-e47b17535e6b" },
+  { key: "rulounge", id: "72f0ecc3-4fb2-46fc-b9d8-94d1a8e923ad" },
+  { key: "test station", id: "c76e490d-d139-40bf-bb6d-80df26d57d16" }
+]
+
 const App: React.FC = () => {
+  const [selectedStation, setSelectedStation] = useState(stations[0])
+
   return (
     <div className="demo-container">
       <h1>Tunio Player Demo</h1>
+      <div className="station-switcher">
+        {stations.map(station => (
+          <button
+            key={station.key}
+            type="button"
+            className={station.key === selectedStation.key ? "active" : ""}
+            onClick={() => setSelectedStation(station)}
+          >
+            {station.key}
+          </button>
+        ))}
+      </div>
       <div className="player-wrapper-dark">
         <h2>Player with Ambient Mode</h2>
-        <Player id="bb6a70c0-7f61-47c9-830a-fab3b5060b50" ambient />
+        <Player id={selectedStation.id} ambient />
       </div>
 
       {/* <div className="player-wrapper-light">
