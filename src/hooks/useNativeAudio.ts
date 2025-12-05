@@ -259,10 +259,11 @@ const useNativeAudio = (streams: Array<string> = []) => {
   }
 
   const stop = () => {
-    if (!audioRef.current || !state.isPlaying) return
+    if (!audioRef.current) return
 
     resetAutoReconnect()
     audioRef.current.pause()
+    setState(prev => ({ ...prev, isPlaying: false, buffering: false, loading: false }))
   }
 
   const setVolume = (volume: number) => {
