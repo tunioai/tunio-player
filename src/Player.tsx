@@ -72,6 +72,21 @@ const Player: React.FC<Props> = ({
     }
   )
 
+  const isIOS = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent || "")
+
+  const playButtonLoading = useMemo(() => {
+    // В HLS/buffered режиме (особенно на iOS) "buffering" часто дёргается,
+    // поэтому считаем загрузкой только момент до начала воспроизведения.
+    if (playbackMode === "buffered") {
+      // можно ограничить только iOS, если на десктопе всё ок:
+      // if (isIOS) { ... }
+      return !isPlaying && buffering
+    }
+
+    // В live режиме оставляем старое поведение
+    return buffering
+  }, [buffering, isPlaying, playbackMode, isIOS])
+
   useEffect(() => {
     stopRef.current = stop
   }, [stop])
@@ -420,7 +435,7 @@ const Player: React.FC<Props> = ({
                   action={isPlaying ? "stop" : "play"}
                   onStop={handlePlayToggle}
                   onPlay={handlePlayToggle}
-                  loading={buffering}
+                  loading={playButtonLoading}
                 />
                 <MuteButton onClick={toggleMute} muted={isMuted} />
                 <VisualizerButton onClick={handleVisualizerOpen} />
