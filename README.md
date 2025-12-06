@@ -18,15 +18,14 @@ pnpm add tunio-player
 
 ```tsx
 import { TunioPlayer } from 'tunio-player'
-import 'tunio-player/dist/audio-player.css'
 
 function App() {
   return (
     <div>
       <TunioPlayer 
-        name="your-radio-name" 
+        id="your-radio-id" 
         theme="dark" 
-        ambient={true} 
+        online
       />
     </div>
   )
@@ -35,10 +34,11 @@ function App() {
 
 ### Props
 
-- `name` (string): Radio station name
+- `id` (string): Radio station id
 - `theme` ("dark" | "light"): Player theme (default: "dark")
 - `ambient` (boolean): Enable ambient background effect (default: false)
 - `opacity` (number): Player opacity (default: 1)
+- `online` (boolean): online mode by default
 
 ## Features
 

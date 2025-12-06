@@ -25,7 +25,8 @@ const Player: React.FC<Props> = ({
   ambient = false,
   theme = "dark",
   visualizerOnly = false,
-  liquid = false
+  liquid = false,
+  online = false
 }) => {
   const playerIdRef = useRef<string>(generateUniqueId())
   const playerRef = useRef<HTMLDivElement>(null)
@@ -48,9 +49,32 @@ const Player: React.FC<Props> = ({
   const [isVisualizerOpen, setIsVisualizerOpen] = useState(visualizerOnly)
   const fullscreenOwnerRef = useRef(false)
 
-  const streams = useMemo(() => (visualizerOnly ? [] : streamsData), [streamsData, visualizerOnly])
+  const [playbackMode, setPlaybackMode] = useState<"live" | "buffered">(() => (online ? "live" : "buffered"))
+  const stopRef = useRef<() => void>(() => {})
 
-  const { isPlaying, volume, isMuted, buffering, setVolume, toggleMute, play, stop, audioRef } = useNativeAudio(streams)
+  const bufferedStreamURL = useMemo(() => {
+    if (streamsData.length <= 1) return streamsData[0]
+    return streamsData[1]
+  }, [streamConfig?.stream_name])
+
+  const streams = useMemo(() => {
+    if (visualizerOnly) return []
+    if (playbackMode === "buffered") {
+      return bufferedStreamURL ? [bufferedStreamURL] : []
+    }
+    return [...streamsData]
+  }, [bufferedStreamURL, playbackMode, streamsData, visualizerOnly])
+
+  const { isPlaying, volume, isMuted, buffering, setVolume, toggleMute, play, stop, audioRef } = useNativeAudio(
+    streams,
+    {
+      mode: playbackMode
+    }
+  )
+
+  useEffect(() => {
+    stopRef.current = stop
+  }, [stop])
 
   const volumeBarBackgroundSize = calculateBackgroundSize(volume, 0, 1)
 
@@ -157,6 +181,23 @@ const Player: React.FC<Props> = ({
     }
   }, [isPlaying, play, stop])
 
+  const handlePlaybackModeChange = useCallback(
+    (mode: "live" | "buffered") => {
+      setPlaybackMode(prev => {
+        if (prev === mode) {
+          return prev
+        }
+        stop()
+        return mode
+      })
+    },
+    [stop]
+  )
+
+  const handlePlaybackModeToggle = useCallback(() => {
+    handlePlaybackModeChange(playbackMode === "live" ? "buffered" : "live")
+  }, [handlePlaybackModeChange, playbackMode])
+
   const enterFullscreen = useCallback(() => {
     const element = playerRef.current
     if (!element || fullscreenOwnerRef.current) return
@@ -237,6 +278,17 @@ const Player: React.FC<Props> = ({
       }
     }
   }, [exitFullscreen])
+
+  useEffect(() => {
+    const desiredMode = online ? "live" : "buffered"
+    setPlaybackMode(prev => {
+      if (prev === desiredMode) {
+        return prev
+      }
+      stopRef.current()
+      return desiredMode
+    })
+  }, [online])
 
   useEffect(() => {
     if (visualizerOnly) {
@@ -332,7 +384,21 @@ const Player: React.FC<Props> = ({
             ...(liquid ? { backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" } : {})
           }}
         >
-          <Cover track={currentTrack} streamConfig={streamConfig} onImageLoad={onCoverImageLoad} />
+          <div className="tunio-cover-wrapper">
+            <Cover track={currentTrack} streamConfig={streamConfig} onImageLoad={onCoverImageLoad} />
+            {!visualizerOnly && (
+              <button
+                type="button"
+                className={clsx("tunio-playback-indicator", {
+                  "tunio-live": playbackMode === "live",
+                  "tunio-buffered": playbackMode === "buffered"
+                })}
+                onClick={handlePlaybackModeToggle}
+              >
+                LIVE
+              </button>
+            )}
+          </div>
           {!isVisualizerOpen && (
             <div className="tunio-container">
               <div ref={titleContainerRef}>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import Hls from "hls.js"
 
 type AudioState = {
   isPlaying: boolean
@@ -10,12 +11,20 @@ type AudioState = {
   buffering: boolean
 }
 
+type PlaybackMode = "live" | "buffered"
+
+type UseNativeAudioOptions = {
+  mode?: PlaybackMode
+}
+
+const BUFFERED_SEGMENT_COUNT = 6
+
 const areArraysEqual = (a: Array<string>, b: Array<string>): boolean => {
   if (a.length !== b.length) return false
   return a.every((item, index) => item === b[index])
 }
 
-const useNativeAudio = (streams: Array<string> = []) => {
+const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOptions = {}) => {
   const [state, setState] = useState<AudioState>({
     isPlaying: false,
     volume: 0.7,
@@ -23,6 +32,9 @@ const useNativeAudio = (streams: Array<string> = []) => {
     loading: false,
     buffering: false
   })
+
+  const playbackMode: PlaybackMode = options.mode ?? "live"
+  const isLiveMode = playbackMode === "live"
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const bufferingTimer = useRef<NodeJS.Timeout | null>(null)
@@ -34,6 +46,7 @@ const useNativeAudio = (streams: Array<string> = []) => {
   const initAudioRef = useRef<(streamUrl: string) => void>(() => undefined)
   const resetAutoReconnectRef = useRef<() => void>(() => undefined)
   const clearTimersRef = useRef<() => void>(() => undefined)
+  const hlsRef = useRef<Hls | null>(null)
 
   const clearReconnectTimer = (resetAttempts = true) => {
     if (reconnectTimer.current) {
@@ -55,9 +68,43 @@ const useNativeAudio = (streams: Array<string> = []) => {
   }
   clearTimersRef.current = clearTimers
 
+  const destroyHlsInstance = () => {
+    if (hlsRef.current) {
+      hlsRef.current.destroy()
+      hlsRef.current = null
+    }
+  }
+
   const attemptReconnect = () => {
     if (!shouldAutoReconnect.current) {
       reconnectAttempts.current = 0
+      return
+    }
+
+    if (!isLiveMode) {
+      const streamUrl = currentStreamUrl.current
+      if (!streamUrl) return
+
+      if (hlsRef.current) {
+        hlsRef.current.startLoad()
+      } else {
+        setupAudioSource(streamUrl)
+      }
+
+      const audio = audioRef.current
+      if (!audio) {
+        return
+      }
+
+      if (audio.paused) {
+        const playPromise = audio.play()
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            /* ignore */
+          })
+        }
+      }
+
       return
     }
 
@@ -101,6 +148,53 @@ const useNativeAudio = (streams: Array<string> = []) => {
   }
   resetAutoReconnectRef.current = resetAutoReconnect
 
+  const setupAudioSource = (streamUrl: string) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (playbackMode === "buffered") {
+      destroyHlsInstance()
+
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: true,
+          startPosition: 0,
+          liveSyncDurationCount: BUFFERED_SEGMENT_COUNT,
+          liveMaxLatencyDurationCount: BUFFERED_SEGMENT_COUNT + 2
+        })
+        hlsRef.current = hls
+
+        hls.attachMedia(audio)
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+          hls.loadSource(streamUrl)
+        })
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad()
+            return
+          }
+
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError()
+            return
+          }
+
+          if (data.fatal) {
+            destroyHlsInstance()
+            setupAudioSource(streamUrl)
+          }
+        })
+      } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
+        audio.src = streamUrl
+      } else {
+        audio.src = streamUrl
+      }
+    } else {
+      audio.src = streamUrl
+    }
+  }
+
   const initAudio = (streamUrl: string, loadImmediately = false) => {
     if (audioRef.current) {
       audioRef.current.pause()
@@ -113,8 +207,10 @@ const useNativeAudio = (streams: Array<string> = []) => {
     const audio = audioRef.current
     audio.volume = state.volume
     audio.muted = state.isMuted
-    audio.preload = "none"
+    audio.preload = playbackMode === "buffered" ? "auto" : "none"
     audio.crossOrigin = "anonymous"
+
+    destroyHlsInstance()
 
     audio.onloadstart = () => {
       setState(prev => ({ ...prev, loading: true }))
@@ -176,12 +272,41 @@ const useNativeAudio = (streams: Array<string> = []) => {
     currentStreamUrl.current = streamUrl
 
     if (loadImmediately) {
-      audio.src = streamUrl
+      setupAudioSource(streamUrl)
     } else {
       audio.removeAttribute("src")
     }
   }
   initAudioRef.current = initAudio
+
+  useEffect(() => {
+    if (typeof window === "undefined" || playbackMode !== "buffered") return
+
+    const handleOnline = () => {
+      if (!currentStreamUrl.current) return
+
+      if (hlsRef.current) {
+        hlsRef.current.startLoad()
+      } else {
+        setupAudioSource(currentStreamUrl.current)
+      }
+
+      const audio = audioRef.current
+      if (!audio) return
+
+      if (audio.paused) {
+        const playPromise = audio.play()
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            /* ignore */
+          })
+        }
+      }
+    }
+
+    window.addEventListener("online", handleOnline)
+    return () => window.removeEventListener("online", handleOnline)
+  }, [playbackMode])
 
   useEffect(() => {
     if (areArraysEqual(streams, previousStreams.current)) {
@@ -202,6 +327,7 @@ const useNativeAudio = (streams: Array<string> = []) => {
     return () => {
       resetAutoReconnectRef.current()
       clearTimersRef.current()
+      destroyHlsInstance()
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current.removeAttribute("src")
@@ -225,11 +351,14 @@ const useNativeAudio = (streams: Array<string> = []) => {
     if (!audioRef.current || state.isPlaying || !currentStreamUrl.current) return
 
     const audio = audioRef.current
-    if (audio.src !== currentStreamUrl.current) {
-      audio.src = currentStreamUrl.current
+    if (playbackMode === "buffered") {
+      setupAudioSource(currentStreamUrl.current)
+    } else {
+      if (audio.src !== currentStreamUrl.current) {
+        setupAudioSource(currentStreamUrl.current)
+      }
+      audio.load()
     }
-
-    audio.load()
 
     setState(prev => ({ ...prev, buffering: true }))
     clearReconnectTimer()
@@ -258,6 +387,7 @@ const useNativeAudio = (streams: Array<string> = []) => {
     audioRef.current.pause()
     audioRef.current.removeAttribute("src")
     audioRef.current.load()
+    destroyHlsInstance()
     setState(prev => ({ ...prev, isPlaying: false, buffering: false, loading: false }))
   }
 

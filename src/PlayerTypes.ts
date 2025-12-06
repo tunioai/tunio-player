@@ -5,4 +5,5 @@ export interface Props {
   opacity?: number
   visualizerOnly?: boolean
   liquid?: boolean
+  online?: boolean
 }

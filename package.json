@@ -1,6 +1,6 @@
 {
   "name": "tunio-player",
-  "version": "1.1.10",
+  "version": "1.1.11",
   "description": "Tunio Audio Player Component",
   "type": "module",
   "main": "dist/audio-player.umd.js",
@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "hls.js": "^1.5.18",
     "lucide-react": "^0.511.0",
     "qrcode.react": "^4.2.0",
     "rollup": "^4.41.1"
