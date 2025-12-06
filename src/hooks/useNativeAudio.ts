@@ -19,10 +19,15 @@ type UseNativeAudioOptions = {
 
 const BUFFERED_SEGMENT_COUNT = 6
 
+// Для iOS нужен больший буфер для стабильного воспроизведения
+const IOS_BUFFERED_SEGMENT_COUNT = 4
+
 const areArraysEqual = (a: Array<string>, b: Array<string>): boolean => {
   if (a.length !== b.length) return false
   return a.every((item, index) => item === b[index])
 }
+
+const isIOS = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent || "")
 
 const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOptions = {}) => {
   const [state, setState] = useState<AudioState>({
@@ -47,6 +52,8 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
   const resetAutoReconnectRef = useRef<() => void>(() => undefined)
   const clearTimersRef = useRef<() => void>(() => undefined)
   const hlsRef = useRef<Hls | null>(null)
+  const isBufferingRef = useRef<boolean>(false)
+  const bufferRecoveryTimer = useRef<NodeJS.Timeout | null>(null)
 
   const clearReconnectTimer = (resetAttempts = true) => {
     if (reconnectTimer.current) {
@@ -63,6 +70,10 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
     if (bufferingTimer.current) {
       clearTimeout(bufferingTimer.current)
       bufferingTimer.current = null
+    }
+    if (bufferRecoveryTimer.current) {
+      clearTimeout(bufferRecoveryTimer.current)
+      bufferRecoveryTimer.current = null
     }
     clearReconnectTimer()
   }
@@ -155,12 +166,39 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
     if (playbackMode === "buffered") {
       destroyHlsInstance()
 
-      if (Hls.isSupported()) {
+      // На iOS используем нативный плеер с оптимизированными настройками
+      if (isIOS && audio.canPlayType("application/vnd.apple.mpegurl")) {
+        audio.src = streamUrl
+        // Используем auto для лучшей буферизации
+        audio.preload = "auto"
+      } else if (Hls.isSupported()) {
+        const segmentCount = isIOS ? IOS_BUFFERED_SEGMENT_COUNT : BUFFERED_SEGMENT_COUNT
+        
         const hls = new Hls({
           enableWorker: true,
-          startPosition: 0,
-          liveSyncDurationCount: BUFFERED_SEGMENT_COUNT,
-          liveMaxLatencyDurationCount: BUFFERED_SEGMENT_COUNT + 2
+          startPosition: -1,
+          liveSyncDurationCount: segmentCount,
+          liveMaxLatencyDurationCount: segmentCount + 2,
+          // Увеличенный буфер для iOS
+          maxBufferLength: isIOS ? 20 : 15,
+          maxMaxBufferLength: isIOS ? 40 : 30,
+          maxBufferSize: 60 * 1000 * 1000,
+          maxBufferHole: 0.5,
+          highBufferWatchdogPeriod: 2,
+          nudgeMaxRetry: 5,
+          nudgeOffset: 0.1,
+          // Таймауты
+          manifestLoadingTimeOut: 10000,
+          manifestLoadingMaxRetry: 4,
+          levelLoadingTimeOut: 10000,
+          levelLoadingMaxRetry: 4,
+          fragLoadingTimeOut: 20000,
+          fragLoadingMaxRetry: 6,
+          // Дополнительные настройки для стабильности
+          backBufferLength: isIOS ? 10 : 5,
+          liveDurationInfinity: true,
+          // Низкий latency режим отключаем для стабильности
+          lowLatencyMode: false
         })
         hlsRef.current = hls
 
@@ -169,9 +207,30 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
           hls.loadSource(streamUrl)
         })
 
+        // Следим за уровнем буфера
+        hls.on(Hls.Events.BUFFER_APPENDING, () => {
+          if (bufferRecoveryTimer.current) {
+            clearTimeout(bufferRecoveryTimer.current)
+            bufferRecoveryTimer.current = null
+          }
+        })
+
+        hls.on(Hls.Events.FRAG_BUFFERED, () => {
+          // Если были проблемы с буфером, пытаемся возобновить
+          if (isBufferingRef.current && audio.paused && shouldAutoReconnect.current) {
+            audio.play().catch(() => {
+              /* ignore */
+            })
+          }
+        })
+
         hls.on(Hls.Events.ERROR, (_event, data) => {
+          console.log('HLS Error:', data.type, data.details)
+          
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            hls.startLoad()
+            if (data.fatal) {
+              hls.startLoad()
+            }
             return
           }
 
@@ -182,7 +241,9 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
 
           if (data.fatal) {
             destroyHlsInstance()
-            setupAudioSource(streamUrl)
+            if (shouldAutoReconnect.current) {
+              setupAudioSource(streamUrl)
+            }
           }
         })
       } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
@@ -216,26 +277,61 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
       setState(prev => ({ ...prev, loading: true }))
     }
 
+    audio.onloadedmetadata = () => {
+      setState(prev => ({ ...prev, loading: false }))
+    }
+
     audio.oncanplay = () => {
       setState(prev => ({ ...prev, loading: false }))
       reconnectAttempts.current = 0
       clearReconnectTimer(false)
+      isBufferingRef.current = false
+    }
+
+    audio.oncanplaythrough = () => {
+      // Достаточно данных для непрерывного воспроизведения
+      isBufferingRef.current = false
+      setState(prev => ({ ...prev, buffering: false }))
     }
 
     audio.onplaying = () => {
       setState(prev => ({ ...prev, isPlaying: true, buffering: false }))
       shouldAutoReconnect.current = true
+      isBufferingRef.current = false
       clearReconnectTimer()
+      
+      if (bufferRecoveryTimer.current) {
+        clearTimeout(bufferRecoveryTimer.current)
+        bufferRecoveryTimer.current = null
+      }
     }
 
     audio.onwaiting = () => {
+      isBufferingRef.current = true
       setState(prev => ({ ...prev, buffering: true }))
+      
+      // На iOS даём больше времени на восстановление буфера
+      if (isIOS && shouldAutoReconnect.current) {
+        if (bufferRecoveryTimer.current) {
+          clearTimeout(bufferRecoveryTimer.current)
+        }
+        
+        bufferRecoveryTimer.current = setTimeout(() => {
+          if (audio.paused && shouldAutoReconnect.current) {
+            audio.play().catch(() => {
+              /* ignore */
+            })
+          }
+          bufferRecoveryTimer.current = null
+        }, 1000)
+      }
     }
 
     audio.onpause = () => {
       setState(prev => ({ ...prev, isPlaying: false, buffering: false }))
       if (!shouldAutoReconnect.current) {
         clearReconnectTimer()
+        isBufferingRef.current = false
       }
     }
 
@@ -246,6 +342,7 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
 
     audio.onerror = () => {
       setState(prev => ({ ...prev, isPlaying: false, loading: false, buffering: false }))
+      isBufferingRef.current = false
 
       if (shouldAutoReconnect.current) {
         attemptReconnect()
@@ -253,20 +350,46 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
     }
 
     audio.addEventListener("stalled", () => {
+      isBufferingRef.current = true
       setState(prev => ({ ...prev, buffering: true }))
-      if (shouldAutoReconnect.current) {
-        attemptReconnect()
+      
+      if (shouldAutoReconnect.current && isIOS) {
+        if (hlsRef.current) {
+          hlsRef.current.startLoad()
+        }
       }
     })
 
     audio.addEventListener("suspend", () => {
-      if (audio.paused && shouldAutoReconnect.current && state.isPlaying) {
+      // На iOS suspend может быть нормальным поведением, не паникуем
+      if (!isIOS && audio.paused && shouldAutoReconnect.current && state.isPlaying) {
         attemptReconnect()
       }
     })
 
     audio.addEventListener("timeupdate", () => {
       reconnectAttempts.current = 0
+      
+      // Если воспроизведение идёт, снимаем флаг буферизации
+      if (!audio.paused && isBufferingRef.current) {
+        isBufferingRef.current = false
+        setState(prev => ({ ...prev, buffering: false }))
+      }
+    })
+
+    audio.addEventListener("progress", () => {
+      // Данные загружаются
+      if (isBufferingRef.current && audio.buffered.length > 0) {
+        const bufferedEnd = audio.buffered.end(audio.buffered.length - 1)
+        const currentTime = audio.currentTime
+        
+        // Если есть достаточно буфера впереди
+        if (bufferedEnd - currentTime > 2 && audio.paused && shouldAutoReconnect.current) {
+          audio.play().catch(() => {
+            /* ignore */
+          })
+        }
+      }
     })
 
     currentStreamUrl.current = streamUrl
@@ -294,7 +417,7 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
       const audio = audioRef.current
       if (!audio) return
 
-      if (audio.paused) {
+      if (audio.paused && shouldAutoReconnect.current) {
         const playPromise = audio.play()
         if (playPromise !== undefined) {
           playPromise.catch(() => {
@@ -304,8 +427,21 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
       }
     }
 
+    const handleOffline = () => {
+      // При потере соединения на iOS помечаем состояние
+      if (isIOS) {
+        isBufferingRef.current = true
+        setState(prev => ({ ...prev, buffering: true }))
+      }
+    }
+
     window.addEventListener("online", handleOnline)
-    return () => window.removeEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+    
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+    }
   }, [playbackMode])
 
   useEffect(() => {
@@ -361,8 +497,10 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
     }
 
     setState(prev => ({ ...prev, buffering: true }))
+    isBufferingRef.current = true
     clearReconnectTimer()
     reconnectAttempts.current = 0
+    shouldAutoReconnect.current = true
 
     const playPromise = audio.play()
 
@@ -370,12 +508,15 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
       playPromise
         .then(() => {
           bufferingTimer.current = setTimeout(() => {
-            setState(prev => ({ ...prev, buffering: false }))
+            if (!isBufferingRef.current) {
+              setState(prev => ({ ...prev, buffering: false }))
+            }
           }, 500)
         })
         .catch(() => {
           setState(prev => ({ ...prev, isPlaying: false, buffering: false }))
           shouldAutoReconnect.current = false
+          isBufferingRef.current = false
         })
     }
   }
@@ -388,6 +529,7 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
     audioRef.current.removeAttribute("src")
     audioRef.current.load()
     destroyHlsInstance()
+    isBufferingRef.current = false
     setState(prev => ({ ...prev, isPlaying: false, buffering: false, loading: false }))
   }
 
