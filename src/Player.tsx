@@ -55,7 +55,7 @@ const Player: React.FC<Props> = ({
   const bufferedStreamURL = useMemo(() => {
     if (streamsData.length <= 1) return streamsData[0]
     return streamsData[1]
-  }, [streamConfig?.stream_name])
+  }, [streamsData])
 
   const streams = useMemo(() => {
     if (visualizerOnly) return []
@@ -399,7 +399,7 @@ const Player: React.FC<Props> = ({
               </button>
             )}
           </div>
-          {!isVisualizerOpen && (
+          {!isVisualizerOpen && streamsData.length > 0 && (
             <div className="tunio-container">
               <div ref={titleContainerRef}>
                 <div className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}>
