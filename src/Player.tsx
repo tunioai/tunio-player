@@ -75,15 +75,15 @@ const Player: React.FC<Props> = ({
   const isIOS = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent || "")
 
   const playButtonLoading = useMemo(() => {
-    // В HLS/buffered режиме (особенно на iOS) "buffering" часто дёргается,
-    // поэтому считаем загрузкой только момент до начала воспроизведения.
+    // In HLS/buffered mode (especially on iOS) the buffering flag often flickers,
+    // so treat it as loading only before playback actually begins.
     if (playbackMode === "buffered") {
-      // можно ограничить только iOS, если на десктопе всё ок:
+      // Could limit this to iOS only if desktop works fine:
       // if (isIOS) { ... }
       return !isPlaying && buffering
     }
 
-    // В live режиме оставляем старое поведение
+    // Keep the old behavior in live mode
     return buffering
   }, [buffering, isPlaying, playbackMode, isIOS])
 
@@ -195,23 +195,6 @@ const Player: React.FC<Props> = ({
       )
     }
   }, [isPlaying, play, stop])
-
-  const handlePlaybackModeChange = useCallback(
-    (mode: "live" | "buffered") => {
-      setPlaybackMode(prev => {
-        if (prev === mode) {
-          return prev
-        }
-        stop()
-        return mode
-      })
-    },
-    [stop]
-  )
-
-  const handlePlaybackModeToggle = useCallback(() => {
-    handlePlaybackModeChange(playbackMode === "live" ? "buffered" : "live")
-  }, [handlePlaybackModeChange, playbackMode])
 
   const enterFullscreen = useCallback(() => {
     const element = playerRef.current
@@ -401,18 +384,6 @@ const Player: React.FC<Props> = ({
         >
           <div className="tunio-cover-wrapper">
             <Cover track={currentTrack} streamConfig={streamConfig} onImageLoad={onCoverImageLoad} />
-            {!visualizerOnly && (
-              <button
-                type="button"
-                className={clsx("tunio-playback-indicator", {
-                  "tunio-live": playbackMode === "live",
-                  "tunio-buffered": playbackMode === "buffered"
-                })}
-                onClick={handlePlaybackModeToggle}
-              >
-                LIVE
-              </button>
-            )}
           </div>
           {!isVisualizerOpen && streamsData.length > 0 && (
             <div className="tunio-container">
