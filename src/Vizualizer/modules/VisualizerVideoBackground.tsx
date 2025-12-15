@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StreamConfig } from "../../types"
 
-const DEFAULT_BASE_URL = "https://radio-cdn.website.yandexcloud.net/live-backgrounds"
+const DEFAULT_BASE_URL = "https://cdn.tunio.ai/wallpapers_short_backgrounds"
 
 export type VisualizerVideoBackgroundProps = {
   streamConfig: StreamConfig
