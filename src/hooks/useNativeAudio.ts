@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from "react"
 import Hls from "hls.js"
+import { metadataFromTagList } from "../playlistMetadata"
+import type { PlaylistTrackMetadata } from "../playlistMetadata"
 
 type AudioState = {
   isPlaying: boolean
@@ -15,6 +17,7 @@ type PlaybackMode = "live" | "buffered"
 
 type UseNativeAudioOptions = {
   mode?: PlaybackMode
+  onMetadataUpdate?: (metadata: PlaylistTrackMetadata[]) => void
 }
 
 const BUFFERED_SEGMENT_COUNT = 6
@@ -54,6 +57,13 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
   const hlsRef = useRef<Hls | null>(null)
   const isBufferingRef = useRef<boolean>(false)
   const bufferRecoveryTimer = useRef<NodeJS.Timeout | null>(null)
+  const metadataCallbackRef = useRef<((metadata: PlaylistTrackMetadata[]) => void) | undefined>(
+    options.onMetadataUpdate
+  )
+
+  useEffect(() => {
+    metadataCallbackRef.current = options.onMetadataUpdate
+  }, [options.onMetadataUpdate])
 
   const clearReconnectTimer = (resetAttempts = true) => {
     if (reconnectTimer.current) {
@@ -205,6 +215,24 @@ const useNativeAudio = (streams: Array<string> = [], options: UseNativeAudioOpti
         hls.attachMedia(audio)
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
           hls.loadSource(streamUrl)
+        })
+
+        hls.on(Hls.Events.LEVEL_UPDATED, (_event, data) => {
+          const callback = metadataCallbackRef.current
+          if (!callback) return
+          const fragments = data?.details?.fragments ?? []
+          const metadataEntries: PlaylistTrackMetadata[] = []
+
+          for (const fragment of fragments) {
+            const metadata = metadataFromTagList(fragment.tagList)
+            if (metadata) {
+              metadataEntries.push(metadata)
+            }
+          }
+
+          if (metadataEntries.length) {
+            callback(metadataEntries)
+          }
         })
 
         // Track buffer level

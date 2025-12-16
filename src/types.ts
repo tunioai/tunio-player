@@ -1,10 +1,8 @@
 export interface Track {
   artist: string
   duration: number
-  is_ai: boolean
-  is_music: boolean
   title: string
-  uuid: string
+  artwork: string
 }
 
 export interface StreamConfig {

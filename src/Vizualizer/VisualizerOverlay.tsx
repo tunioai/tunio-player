@@ -4,7 +4,7 @@ import clsx from "clsx"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import WaterMark from "../WaterMark"
 // import QRCode from "./QRCode"
-import type { Track, Stream, TrackBackground, StreamConfig } from "../types"
+import type { Track, Stream, TrackBackground, StreamConfig, CurrentResponse } from "../types"
 import VisualizerAudioCanvas from "./VisualizerAudioCanvas"
 import VisualizerAmbientCanvas from "./VisualizerAmbientCanvas"
 
@@ -17,6 +17,7 @@ type VisualizerOverlayProps = {
   streamConfig: StreamConfig | null
   track?: Track
   coverURL: string | null
+  streamId?: string
 }
 
 type HostVisualizerPayload = {
@@ -26,6 +27,8 @@ type HostVisualizerPayload = {
   isFailoverMode?: boolean
 }
 
+const EMBEDDED_TRACK_POLL_INTERVAL = 10_000
+
 const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
   isOpen,
   onClose,
@@ -34,11 +37,17 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
   track,
   streamConfig,
   stream,
-  coverURL
+  coverURL,
+  streamId
 }) => {
   const backdropRef = useRef<HTMLDivElement | null>(null)
   const [hostPayload, setHostPayload] = useState<HostVisualizerPayload | null>(null)
   const [isFailoverMode, setIsFailoverMode] = useState(false)
+  const [embeddedTrackOverride, setEmbeddedTrackOverride] = useState<Track | undefined>(undefined)
+  const [embeddedStreamOverride, setEmbeddedStreamOverride] = useState<Stream | null>(null)
+  const embeddedPollAbortRef = useRef<AbortController | null>(null)
+  const embeddedPollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastEmbeddedTrackSignatureRef = useRef<string | null>(null)
 
   const isEmbedded = useMemo(() => {
     if (typeof window === "undefined") return false
@@ -89,6 +98,87 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
     return coverURL || `https://cp.tunio.ai/api/d/image/stream-${streamConfig?.stream_name}.web`
   }
 
+  const handleEmbeddedDataUpdate = useCallback((data: CurrentResponse) => {
+    if (!data?.success) return
+
+    const signatureParts = [
+      data.track?.title ?? "",
+      data.track?.artist ?? "",
+      data.stream?.track_started_at ? new Date(data.stream.track_started_at).getTime() : ""
+    ]
+    const signature = signatureParts.join("|")
+
+    if (signature && lastEmbeddedTrackSignatureRef.current === signature) {
+      return
+    }
+    lastEmbeddedTrackSignatureRef.current = signature
+
+    if (data.track) {
+      setEmbeddedTrackOverride(data.track)
+    }
+
+    if (data.stream) {
+      setEmbeddedStreamOverride(data.stream)
+    }
+  }, [])
+
+  const pollEmbeddedCurrentTrack = useCallback(async () => {
+    if (!streamId) return
+
+    if (embeddedPollAbortRef.current) {
+      embeddedPollAbortRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    embeddedPollAbortRef.current = controller
+
+    try {
+      const response = await fetch(`https://api.tunio.ai/v1/stream/${streamId}/current`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        cache: "no-store",
+        signal: controller.signal
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch current track: ${response.status}`)
+      }
+
+      const data: CurrentResponse = await response.json()
+      handleEmbeddedDataUpdate(data)
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return
+      console.warn("Unable to fetch embedded current track", error)
+    } finally {
+      embeddedPollAbortRef.current = null
+    }
+  }, [streamId, handleEmbeddedDataUpdate])
+
+  useEffect(() => {
+    if (!isEmbedded) return
+    if (!streamId) return
+    if (typeof window === "undefined") return
+
+    pollEmbeddedCurrentTrack()
+    embeddedPollIntervalRef.current = setInterval(pollEmbeddedCurrentTrack, EMBEDDED_TRACK_POLL_INTERVAL)
+
+    return () => {
+      if (embeddedPollIntervalRef.current) {
+        window.clearInterval(embeddedPollIntervalRef.current)
+        embeddedPollIntervalRef.current = null
+      }
+      if (embeddedPollAbortRef.current) {
+        embeddedPollAbortRef.current.abort()
+        embeddedPollAbortRef.current = null
+      }
+      lastEmbeddedTrackSignatureRef.current = null
+      setEmbeddedTrackOverride(undefined)
+      setEmbeddedStreamOverride(null)
+    }
+  }, [isEmbedded, streamId, pollEmbeddedCurrentTrack])
+
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const data = event.data
@@ -117,12 +207,18 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
 
   if (!isOpen) return null
 
-  const stationLabel = hostPayload?.station?.trim() || stream?.title || streamConfig?.stream_name || "Tunio Radio"
+  const resolvedTrack = isEmbedded && embeddedTrackOverride ? embeddedTrackOverride : track
+  const resolvedStreamDetails = isEmbedded && embeddedStreamOverride ? embeddedStreamOverride : stream
+
+  const stationLabel =
+    hostPayload?.station?.trim() || resolvedStreamDetails?.title || streamConfig?.stream_name || "Tunio Radio"
   const shouldUseHostMetadata = isFailoverMode && Boolean(hostPayload)
   const title =
-    shouldUseHostMetadata && hostPayload?.title?.trim() ? hostPayload.title.trim() : track?.title || "Live stream"
+    shouldUseHostMetadata && hostPayload?.title?.trim()
+      ? hostPayload.title.trim()
+      : resolvedTrack?.title || "Live stream"
   const artist =
-    shouldUseHostMetadata && hostPayload?.artist?.trim() ? hostPayload.artist.trim() : track?.artist || "Tunio"
+    shouldUseHostMetadata && hostPayload?.artist?.trim() ? hostPayload.artist.trim() : resolvedTrack?.artist || "Tunio"
   const titleKey = `${stationLabel}-${title}`
   const normalizedStationLength = stationLabel.replace(/\s+/g, "").length
   const stationClassName =
@@ -156,7 +252,7 @@ const VisualizerOverlay: React.FC<VisualizerOverlayProps> = ({
           trackBackground={trackBackground}
           backdropUrl={getBackdropUrl()}
           streamConfig={streamConfig}
-          streamDetails={stream}
+          streamDetails={resolvedStreamDetails}
           isFailoverMode={isFailoverMode}
           liveBackground={isLiveBackground}
           stationLabel={stationLabel}

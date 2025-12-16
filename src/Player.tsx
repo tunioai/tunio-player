@@ -9,6 +9,13 @@ import { PlayPauseButton } from "./buttons/PlayPause"
 import { MuteButton } from "./buttons/Mute"
 import { VisualizerButton } from "./buttons/VisualizerButton"
 import VisualizerOverlay from "./Vizualizer/VisualizerOverlay"
+import {
+  buildTrackFromMetadata,
+  dedupeMetadataEntries,
+  getActiveMetadataTrack,
+  getMetadataIdentity,
+  type PlaylistTrackMetadata
+} from "./playlistMetadata"
 import type { TrackBackground, CurrentResponse, Track, Stream, StreamConfig } from "./types"
 import type { Props } from "./PlayerTypes"
 
@@ -32,12 +39,12 @@ const Player: React.FC<Props> = ({
   const playerRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLSpanElement>(null)
   const titleContainerRef = useRef<HTMLDivElement>(null)
-  const currentTrackUpdateInterval = useRef<NodeJS.Timeout | null>(null)
-  const initialLoadingRef = useRef<boolean>(true)
   const previousIDRef = useRef<string | undefined>(undefined)
   const streamsDataRef = useRef<Array<string>>([])
   const checkOverflowTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const serverTimeOffsetRef = useRef<number>(0)
+  const lastMetadataIdentityRef = useRef<string | null>(null)
 
   const [bgColor, setBgColor] = useState<TrackBackground | null>(null)
   const [currentTrack, setCurrentTrack] = useState<Track | undefined>(undefined)
@@ -52,6 +59,8 @@ const Player: React.FC<Props> = ({
   const [playbackMode, setPlaybackMode] = useState<"live" | "buffered">(() => (online ? "live" : "buffered"))
   const stopRef = useRef<() => void>(() => {})
 
+  console.log("currentTrack", currentTrack)
+
   const bufferedStreamURL = useMemo(() => {
     if (streamsData.length <= 1) return streamsData[0]
     return streamsData[1]
@@ -64,34 +73,6 @@ const Player: React.FC<Props> = ({
     }
     return [...streamsData]
   }, [bufferedStreamURL, playbackMode, streamsData, visualizerOnly])
-
-  const { isPlaying, volume, isMuted, buffering, setVolume, toggleMute, play, stop, audioRef } = useNativeAudio(
-    streams,
-    {
-      mode: playbackMode
-    }
-  )
-
-  const isIOS = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent || "")
-
-  const playButtonLoading = useMemo(() => {
-    // In HLS/buffered mode (especially on iOS) the buffering flag often flickers,
-    // so treat it as loading only before playback actually begins.
-    if (playbackMode === "buffered") {
-      // Could limit this to iOS only if desktop works fine:
-      // if (isIOS) { ... }
-      return !isPlaying && buffering
-    }
-
-    // Keep the old behavior in live mode
-    return buffering
-  }, [buffering, isPlaying, playbackMode, isIOS])
-
-  useEffect(() => {
-    stopRef.current = stop
-  }, [stop])
-
-  const volumeBarBackgroundSize = calculateBackgroundSize(volume, 0, 1)
 
   const checkOverflow = useCallback(() => {
     if (titleRef.current && titleContainerRef.current) {
@@ -113,6 +94,74 @@ const Player: React.FC<Props> = ({
 
     setBgColor(getDominantColor(image))
   }, [])
+
+  const applyMetadataUpdate = useCallback(
+    (metadata: PlaylistTrackMetadata) => {
+      setCurrentTrack(buildTrackFromMetadata(metadata))
+
+      setStreamDetails(prev => {
+        const fallbackTitle = prev?.title || streamConfig?.stream_name || "Tunio Radio"
+        const trackStart =
+          typeof metadata.startTs === "number" ? new Date(metadata.startTs * 1_000) : prev?.track_started_at ?? null
+        const trackEnd =
+          typeof metadata.endTs === "number"
+            ? new Date(metadata.endTs * 1_000)
+            : typeof metadata.startTs === "number" && typeof metadata.duration === "number"
+            ? new Date((metadata.startTs + metadata.duration) * 1_000)
+            : prev?.track_finishing_at ?? null
+        const currentTime = new Date(Date.now() - serverTimeOffsetRef.current)
+
+        return {
+          title: fallbackTitle,
+          current_time: currentTime,
+          track_started_at: trackStart,
+          track_finishing_at: trackEnd
+        }
+      })
+    },
+    [streamConfig]
+  )
+
+  const handlePlaylistMetadataUpdate = useCallback(
+    (entries: PlaylistTrackMetadata[]) => {
+      if (!entries?.length) return
+      const normalizedEntries = dedupeMetadataEntries(entries)
+      const activeTrack = getActiveMetadataTrack(normalizedEntries, serverTimeOffsetRef.current)
+      if (!activeTrack) return
+
+      const identity = getMetadataIdentity(activeTrack)
+      if (identity && lastMetadataIdentityRef.current === identity) {
+        return
+      }
+
+      lastMetadataIdentityRef.current = identity
+      applyMetadataUpdate(activeTrack)
+    },
+    [applyMetadataUpdate]
+  )
+
+  const { isPlaying, volume, isMuted, buffering, setVolume, toggleMute, play, stop, audioRef } = useNativeAudio(
+    streams,
+    {
+      mode: playbackMode,
+      onMetadataUpdate: handlePlaylistMetadataUpdate
+    }
+  )
+
+  const isIOS = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent || "")
+
+  const playButtonLoading = useMemo(() => {
+    if (playbackMode === "buffered") {
+      return isIOS ? !isPlaying && buffering : buffering
+    }
+    return buffering
+  }, [buffering, isPlaying, playbackMode, isIOS])
+
+  useEffect(() => {
+    stopRef.current = stop
+  }, [stop])
+
+  const volumeBarBackgroundSize = calculateBackgroundSize(volume, 0, 1)
 
   const fetchStreamConfig = useCallback(async () => {
     const data = await fetchPlayerConfig(id)
@@ -139,8 +188,14 @@ const Player: React.FC<Props> = ({
         const data: CurrentResponse = await response.json()
 
         if (data.success) {
-          setCurrentTrack(data.track)
           setStreamDetails(data.stream)
+
+          if (data.stream?.current_time) {
+            const serverNow = new Date(data.stream.current_time).getTime()
+            if (Number.isFinite(serverNow)) {
+              serverTimeOffsetRef.current = Date.now() - serverNow
+            }
+          }
 
           if (data.streams?.length && !streamsDataRef.current.length) {
             streamsDataRef.current = data.streams
@@ -160,8 +215,6 @@ const Player: React.FC<Props> = ({
         if (error instanceof Error && error.name !== "AbortError") {
           console.error("Error fetching current track", error)
         }
-      } finally {
-        initialLoadingRef.current = false
       }
     }
 
@@ -313,11 +366,6 @@ const Player: React.FC<Props> = ({
 
     previousIDRef.current = id
 
-    if (currentTrackUpdateInterval.current) {
-      clearInterval(currentTrackUpdateInterval.current)
-      currentTrackUpdateInterval.current = null
-    }
-
     if (checkOverflowTimeoutRef.current) {
       clearTimeout(checkOverflowTimeoutRef.current)
       checkOverflowTimeoutRef.current = null
@@ -331,15 +379,16 @@ const Player: React.FC<Props> = ({
     setBgColor(null)
     setIsOverflowing(false)
     setCurrentTrack(undefined)
+    setStreamDetails(null)
     streamsDataRef.current = []
     setStreamsData([])
     setStreamConfig(null)
+    serverTimeOffsetRef.current = 0
+    lastMetadataIdentityRef.current = null
 
     if (!id) return
 
-    initialLoadingRef.current = true
     fetchCurrentTrack()
-    currentTrackUpdateInterval.current = setInterval(fetchCurrentTrack, 15_000)
   }, [id, isPlaying, stop, fetchCurrentTrack])
 
   useEffect(() => {
@@ -347,9 +396,14 @@ const Player: React.FC<Props> = ({
     return () => window.removeEventListener("resize", checkOverflow)
   }, [checkOverflow])
 
+  const stationLabel = useMemo(
+    () => streamDetails?.title?.trim() || streamConfig?.stream_name || "Tunio Radio",
+    [streamDetails, streamConfig]
+  )
+
   useEffect(() => {
     checkOverflow()
-  }, [currentTrack, checkOverflow])
+  }, [currentTrack, stationLabel, isPlaying, buffering, checkOverflow])
 
   const backgroundStyle = useMemo(() => {
     if (!bgColor) return {}
@@ -364,7 +418,10 @@ const Player: React.FC<Props> = ({
     }
   }, [opacity])
 
-  const titleText = currentTrack ? `${currentTrack?.artist || "Tunio"} - ${currentTrack?.title || "Untitled"}` : " "
+  const shouldShowTrackInfo = (isPlaying || buffering) && currentTrack
+  const titleText = shouldShowTrackInfo
+    ? `${currentTrack.artist || "Tunio"} - <strong>${currentTrack.title || "Untitled"}</strong>`
+    : `${stationLabel}`
 
   return (
     <div
@@ -390,13 +447,13 @@ const Player: React.FC<Props> = ({
               <div ref={titleContainerRef}>
                 <div className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}>
                   <div className="tunio-title-track">
-                    <span ref={titleRef} className="tunio-title-text">
-                      {titleText}
-                    </span>
+                    <span ref={titleRef} className="tunio-title-text" dangerouslySetInnerHTML={{ __html: titleText }} />
                     {isOverflowing && (
-                      <span className="tunio-title-text" aria-hidden="true">
-                        {titleText}
-                      </span>
+                      <span
+                        className="tunio-title-text"
+                        aria-hidden="true"
+                        dangerouslySetInnerHTML={{ __html: titleText }}
+                      />
                     )}
                   </div>
                 </div>
@@ -445,6 +502,7 @@ const Player: React.FC<Props> = ({
           track={currentTrack}
           stream={streamDetails}
           streamConfig={streamConfig}
+          streamId={id}
         />
       )}
     </div>

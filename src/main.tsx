@@ -7,7 +7,7 @@ import "./global.scss"
 const stations = [
   { key: "main", id: "a2f86e8e-5b10-434a-b8b7-e47b17535e6b" },
   { key: "rulounge", id: "72f0ecc3-4fb2-46fc-b9d8-94d1a8e923ad" },
-  { key: "test station", id: "c76e490d-d139-40bf-bb6d-80df26d57d16" }
+  { key: "test station", id: "348d6514-8772-4cfb-94b3-6f24ec7a12e5" }
 ]
 
 const App: React.FC = () => {
