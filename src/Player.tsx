@@ -59,8 +59,6 @@ const Player: React.FC<Props> = ({
   const [playbackMode, setPlaybackMode] = useState<"live" | "buffered">(() => (online ? "live" : "buffered"))
   const stopRef = useRef<() => void>(() => {})
 
-  console.log("currentTrack", currentTrack)
-
   const bufferedStreamURL = useMemo(() => {
     if (streamsData.length <= 1) return streamsData[0]
     return streamsData[1]
