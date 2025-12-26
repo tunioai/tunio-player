@@ -39,6 +39,9 @@ function App() {
 - `ambient` (boolean): Enable ambient background effect (default: false)
 - `opacity` (number): Player opacity (default: 1)
 - `online` (boolean): online mode by default
+- `buttonOnly` (boolean): Render only the play/pause button without the rest of the widget UI (default: false)
+- `buttonOnlyClassName` (string): Extra class applied to the standalone button for custom styles (background, borders, etc.)
+- `buttonOnlySize` (number): Explicit pixel size for the standalone button; icons and spinner scale automatically with this value
 
 ## Features
 
