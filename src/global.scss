@@ -12,6 +12,7 @@
   --player-widget-play-button-size: 28px;
   --player-widget-button-bg-color: #ffffff;
   --player-widget-button-size: 28px;
+  --player-widget-button-icon-color: #333333;
   --player-widget-opacity: 1;
 
   &.tunio-theme-dark {
@@ -30,6 +31,23 @@
     --player-widget-button-hover: #c3c3c3;
     --player-widget-text-color: #000;
     --player-widget-range-bg-color: rgba(0, 0, 0, 0.1);
+  }
+
+  &.tunio-player--button-only {
+    width: auto;
+    display: inline-flex;
+
+    &.tunio-theme-dark {
+      --player-widget-button-bg-color: #000000;
+      --player-widget-button-hover: #111111;
+      --player-widget-button-icon-color: #ffffff;
+    }
+
+    &.tunio-theme-light {
+      --player-widget-button-bg-color: #ffffff;
+      --player-widget-button-hover: #f5f5f5;
+      --player-widget-button-icon-color: #000000;
+    }
   }
 
   .tunio-ambient {
@@ -223,7 +241,7 @@
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #333;
+  color: var(--player-widget-button-icon-color, #333333);
 
   &:hover {
     background-color: var(--player-widget-button-hover);
@@ -236,17 +254,21 @@
   }
 
   .tunio-spinner {
-    width: 13px;
-    height: 13px;
+    width: calc(var(--player-widget-button-size) * 0.46);
+    height: calc(var(--player-widget-button-size) * 0.46);
+    max-width: 16px;
+    max-height: 16px;
     border: 2px solid #f3f3f3;
-    border-top: 2px solid #333;
+    border-top: 2px solid var(--player-widget-button-icon-color, #333333);
     border-radius: 50%;
     animation: tunio-spin 1s linear infinite;
   }
 
   svg {
-    width: 12px;
-    height: 12px;
+    width: calc(var(--player-widget-button-size) * 0.45);
+    height: calc(var(--player-widget-button-size) * 0.45);
+    max-width: 16px;
+    max-height: 16px;
   }
 }
 

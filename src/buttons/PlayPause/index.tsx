@@ -8,9 +8,10 @@ interface Props {
   onPlay: () => void
   onStop: () => void
   loading?: boolean
+  className?: string
 }
 
-export const PlayPauseButton: React.FC<Props> = ({ action, onPlay, onStop, loading }) => {
+export const PlayPauseButton: React.FC<Props> = ({ action, onPlay, onStop, loading, className }) => {
   const handleClick = () => {
     if (action === "play") {
       onPlay()
@@ -20,7 +21,7 @@ export const PlayPauseButton: React.FC<Props> = ({ action, onPlay, onStop, loadi
   }
 
   return (
-    <button className={clsx("tunio-play-pause-button", loading && "tunio-disabled")} onClick={handleClick}>
+    <button className={clsx("tunio-play-pause-button", loading && "tunio-disabled", className)} onClick={handleClick}>
       {loading ? <span className="tunio-spinner" /> : <>{action === "play" ? <PlayIcon /> : <StopIcon />}</>}
     </button>
   )

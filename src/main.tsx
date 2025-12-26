@@ -30,7 +30,12 @@ const App: React.FC = () => {
       </div>
       <div className="player-wrapper-dark">
         <h2>Player with Ambient Mode</h2>
-        <Player id={selectedStation.id} ambient />
+        <Player id={selectedStation.id} theme="light" ambient />
+      </div>
+
+      <div>
+        <h2>Player with Ambient</h2>
+        <Player id={selectedStation.id} theme="dark" buttonOnly buttonOnlySize={50} />
       </div>
 
       {/* <div className="player-wrapper-light">

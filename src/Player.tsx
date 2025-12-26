@@ -33,7 +33,10 @@ const Player: React.FC<Props> = ({
   theme = "dark",
   visualizerOnly = false,
   liquid = false,
-  online = false
+  online = false,
+  buttonOnly = false,
+  buttonOnlyClassName,
+  buttonOnlySize
 }) => {
   const playerIdRef = useRef<string>(generateUniqueId())
   const playerRef = useRef<HTMLDivElement>(null)
@@ -154,6 +157,8 @@ const Player: React.FC<Props> = ({
     }
     return buffering
   }, [buffering, isPlaying, playbackMode, isIOS])
+  const hasPlayableStreams = streams.length > 0
+  const buttonOnlyLoading = playButtonLoading || !hasPlayableStreams
 
   useEffect(() => {
     stopRef.current = stop
@@ -233,6 +238,7 @@ const Player: React.FC<Props> = ({
   )
 
   const handlePlayToggle = useCallback(() => {
+    if (!streams.length) return
     if (isPlaying) {
       stop()
     } else {
@@ -245,7 +251,7 @@ const Player: React.FC<Props> = ({
         "*"
       )
     }
-  }, [isPlaying, play, stop])
+  }, [isPlaying, play, stop, streams.length])
 
   const enterFullscreen = useCallback(() => {
     const element = playerRef.current
@@ -420,88 +426,115 @@ const Player: React.FC<Props> = ({
   const titleText = shouldShowTrackInfo
     ? `${currentTrack.artist || "Tunio"} - <strong>${currentTrack.title || "Untitled"}</strong>`
     : `${stationLabel}`
+  const buttonOnlySizeStyle = useMemo(() => {
+    if (buttonOnly && typeof buttonOnlySize === "number" && buttonOnlySize > 0) {
+      return {
+        "--player-widget-button-size": `${buttonOnlySize}px`
+      } as React.CSSProperties
+    }
+    return undefined
+  }, [buttonOnly, buttonOnlySize])
+
+  const playerClassName = clsx("tunio-player", {
+    "tunio-theme-dark": theme === "dark",
+    "tunio-theme-light": theme === "light",
+    "tunio-player--button-only": buttonOnly
+  })
+  const playerBodyClassName = clsx("tunio-player-body", visualizerOnly && "tunio-player-body--hidden")
 
   return (
-    <div
-      ref={playerRef}
-      className={clsx("tunio-player", { "tunio-theme-dark": theme === "dark", "tunio-theme-light": theme === "light" })}
-    >
-      <div className={`tunio-player-body ${visualizerOnly && "tunio-player-body--hidden"}`}>
-        {ambient && coverURL && !isVisualizerOpen && (
-          <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />
-        )}
-        <div
-          className="tunio-player-wrapper"
-          style={{
-            ...backgroundStyle,
-            ...(liquid ? { backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" } : {})
-          }}
-        >
-          <div className="tunio-cover-wrapper">
-            <Cover track={currentTrack} streamConfig={streamConfig} onImageLoad={onCoverImageLoad} />
-          </div>
-          {!isVisualizerOpen && streamsData.length > 0 && (
-            <div className="tunio-container">
-              <div ref={titleContainerRef}>
-                <div className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}>
-                  <div className="tunio-title-track">
-                    <span ref={titleRef} className="tunio-title-text" dangerouslySetInnerHTML={{ __html: titleText }} />
-                    {isOverflowing && (
-                      <span
-                        className="tunio-title-text"
-                        aria-hidden="true"
-                        dangerouslySetInnerHTML={{ __html: titleText }}
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="tunio-actions">
-                <PlayPauseButton
-                  action={isPlaying ? "stop" : "play"}
-                  onStop={handlePlayToggle}
-                  onPlay={handlePlayToggle}
-                  loading={playButtonLoading}
-                />
-                <MuteButton onClick={toggleMute} muted={isMuted} />
-                <VisualizerButton onClick={handleVisualizerOpen} />
-                <div className="tunio-native-range-wrapper">
-                  <div className="tunio-native-range-container">
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={volume}
-                      onChange={handleVolumeChange}
-                      className="tunio-native-range"
-                      style={{ backgroundSize: volumeBarBackgroundSize }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          {streamConfig?.wetermark && (
-            <div className="tunio-player-watermark">
-              <WaterMark height={14} color={theme === "dark" ? "#fff" : "#000"} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {isVisualizerOpen && streamDetails?.title && (
-        <VisualizerOverlay
-          trackBackground={bgColor}
-          coverURL={coverURL}
-          audioRef={audioRef}
-          isOpen={isVisualizerOpen}
-          onClose={handleVisualizerClose}
-          track={currentTrack}
-          stream={streamDetails}
-          streamConfig={streamConfig}
-          streamId={id}
+    <div ref={playerRef} className={playerClassName} style={buttonOnlySizeStyle}>
+      {buttonOnly ? (
+        <PlayPauseButton
+          action={isPlaying ? "stop" : "play"}
+          onStop={handlePlayToggle}
+          onPlay={handlePlayToggle}
+          loading={buttonOnlyLoading}
+          className={buttonOnlyClassName}
         />
+      ) : (
+        <>
+          <div className={playerBodyClassName}>
+            {ambient && coverURL && !isVisualizerOpen && (
+              <div className="tunio-ambient" style={{ backgroundImage: `url(${coverURL})` }} />
+            )}
+            <div
+              className="tunio-player-wrapper"
+              style={{
+                ...backgroundStyle,
+                ...(liquid ? { backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" } : {})
+              }}
+            >
+              <div className="tunio-cover-wrapper">
+                <Cover track={currentTrack} streamConfig={streamConfig} onImageLoad={onCoverImageLoad} />
+              </div>
+              {!isVisualizerOpen && streamsData.length > 0 && (
+                <div className="tunio-container">
+                  <div ref={titleContainerRef}>
+                    <div className={`tunio-title ${isOverflowing ? "tunio-scrolling" : ""}`}>
+                      <div className="tunio-title-track">
+                        <span
+                          ref={titleRef}
+                          className="tunio-title-text"
+                          dangerouslySetInnerHTML={{ __html: titleText }}
+                        />
+                        {isOverflowing && (
+                          <span
+                            className="tunio-title-text"
+                            aria-hidden="true"
+                            dangerouslySetInnerHTML={{ __html: titleText }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="tunio-actions">
+                    <PlayPauseButton
+                      action={isPlaying ? "stop" : "play"}
+                      onStop={handlePlayToggle}
+                      onPlay={handlePlayToggle}
+                      loading={playButtonLoading}
+                    />
+                    <MuteButton onClick={toggleMute} muted={isMuted} />
+                    <VisualizerButton onClick={handleVisualizerOpen} />
+                    <div className="tunio-native-range-wrapper">
+                      <div className="tunio-native-range-container">
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={volume}
+                          onChange={handleVolumeChange}
+                          className="tunio-native-range"
+                          style={{ backgroundSize: volumeBarBackgroundSize }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {streamConfig?.wetermark && (
+                <div className="tunio-player-watermark">
+                  <WaterMark height={14} color={theme === "dark" ? "#fff" : "#000"} />
+                </div>
+              )}
+            </div>
+          </div>
+          {isVisualizerOpen && streamDetails?.title && (
+            <VisualizerOverlay
+              trackBackground={bgColor}
+              coverURL={coverURL}
+              audioRef={audioRef}
+              isOpen={isVisualizerOpen}
+              onClose={handleVisualizerClose}
+              track={currentTrack}
+              stream={streamDetails}
+              streamConfig={streamConfig}
+              streamId={id}
+            />
+          )}
+        </>
       )}
     </div>
   )

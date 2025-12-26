@@ -8,8 +8,6 @@ const StopIcon: React.FC = () => {
       id="Capa_1"
       xmlns="http://www.w3.org/2000/svg"
       xmlnsXlink="http://www.w3.org/1999/xlink"
-      width="20px"
-      height="20px"
       viewBox="0 0 277.33 277.33"
       xmlSpace="preserve"
     >

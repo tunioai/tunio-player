@@ -6,4 +6,7 @@ export interface Props {
   visualizerOnly?: boolean
   liquid?: boolean
   online?: boolean
+  buttonOnly?: boolean
+  buttonOnlyClassName?: string
+  buttonOnlySize?: number
 }
